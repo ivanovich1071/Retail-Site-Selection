@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useCallback } from "react";
 import { Input, Button, Tooltip, Space, message } from "antd";
 import {
   SearchOutlined, AppstoreOutlined,
@@ -14,14 +14,18 @@ import { analyzeByAddress, analyzeByPolygon, createLocation } from "../services/
 import MapboxMap, { type MapboxMapHandle } from "../components/Map/MapboxMap";
 import DrawPolygonControl from "../components/Map/DrawPolygonControl";
 import AnalysisDrawer from "../components/Panels/AnalysisDrawer";
+import type { Map } from "@2gis/mapgl/global";
 
 export default function MapPage() {
-  const dispatch = useAppDispatch();
-  const mapHandle = useRef<MapboxMapHandle>(null);
+  const dispatch   = useAppDispatch();
+  const mapHandle  = useRef<MapboxMapHandle>(null);
 
-  const [address, setAddress] = useState("");
+  // Stable ref that DrawPolygonControl can use — updated via onMapReady
+  const stableMapRef = useRef<Map | null>(null);
+
+  const [address, setAddress]           = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
-  const [saveLoading, setSaveLoading] = useState(false);
+  const [saveLoading, setSaveLoading]     = useState(false);
 
   const { analysisResult, activeLayer, drawMode } = useAppSelector((s) => s.map);
 
@@ -29,7 +33,11 @@ export default function MapPage() {
     scheme: "Схема", satellite: "Спутник", hybrid: "Гибрид",
   };
 
-  // ── Address search ─────────────────────────────────────────────────
+  const handleMapReady = useCallback((map: Map) => {
+    stableMapRef.current = map;
+  }, []);
+
+  // ── Address search ────────────────────────────────────────────
   const handleSearch = async () => {
     if (!address.trim()) return;
     setSearchLoading(true);
@@ -49,7 +57,7 @@ export default function MapPage() {
     }
   };
 
-  // ── Polygon draw complete ──────────────────────────────────────────
+  // ── Polygon complete ──────────────────────────────────────────
   const handlePolygonComplete = async (polygon: GeoJSON.Polygon) => {
     dispatch(setDrawMode(false));
     dispatch(setAnalysisLoading(true));
@@ -66,13 +74,13 @@ export default function MapPage() {
     }
   };
 
-  // ── Save location ─────────────────────────────────────────────────
-  const handleSaveLocation = async () => {
+  // ── Save location ─────────────────────────────────────────────
+  const handleSave = async () => {
     if (!analysisResult) return;
     setSaveLoading(true);
     try {
       await createLocation({ address: analysisResult.address || "Нарисованная зона" });
-      message.success("Объект сохранён в базу");
+      message.success("Объект сохранён");
     } catch {
       message.error("Не удалось сохранить объект");
     } finally {
@@ -84,10 +92,11 @@ export default function MapPage() {
     <div className="map-page">
       {/* Toolbar */}
       <div style={{
-        position: "absolute", top: 12, left: 12, zIndex: 10,
-        background: "#fff", borderRadius: 8, padding: 8, boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+        position: "absolute", top: 12, left: 12, zIndex: 20,
+        background: "#fff", borderRadius: 8, padding: "8px 10px",
+        boxShadow: "0 2px 10px rgba(0,0,0,0.18)",
         display: "flex", gap: 8, alignItems: "center",
-        flexWrap: "wrap", maxWidth: "calc(100vw - 24px)",
+        flexWrap: "wrap", maxWidth: "calc(100vw - 200px)",
       }}>
         <Input
           placeholder="Введите адрес…"
@@ -102,66 +111,57 @@ export default function MapPage() {
           type="primary"
           onClick={handleSearch}
           loading={searchLoading}
-          disabled={drawMode}
+          disabled={drawMode || !address.trim()}
         >
           Анализ
         </Button>
 
-        <Tooltip title={drawMode ? "Выйти из режима рисования (Esc)" : "Нарисовать зону на карте"}>
+        <Tooltip title={drawMode ? "Нажмите Esc или кнопку Отмена чтобы выйти" : "Нарисовать зону анализа на карте"}>
           <Button
             icon={<EditOutlined />}
             type={drawMode ? "primary" : "default"}
             danger={drawMode}
             onClick={() => dispatch(setDrawMode(!drawMode))}
-            style={drawMode ? {} : { borderColor: "#1a5276", color: "#1a5276" }}
           >
             {drawMode ? "Отмена рисования" : "Нарисовать зону"}
           </Button>
         </Tooltip>
 
-        <Tooltip title="Переключить слой">
+        <Tooltip title="Сменить слой карты">
           <Button icon={<AppstoreOutlined />} onClick={() => dispatch(toggleLayer())}>
             {LAYER_LABELS[activeLayer]}
           </Button>
         </Tooltip>
 
         {analysisResult && !drawMode && (
-          <>
+          <Space>
             <Tooltip title="Сохранить объект">
-              <Button
-                icon={<SaveOutlined />}
-                onClick={handleSaveLocation}
-                loading={saveLoading}
-              />
+              <Button icon={<SaveOutlined />} onClick={handleSave} loading={saveLoading} />
             </Tooltip>
-            <Tooltip title="Очистить">
-              <Button
-                icon={<DeleteOutlined />}
-                danger
-                onClick={() => dispatch(clearAnalysis())}
-              />
+            <Tooltip title="Очистить результаты">
+              <Button icon={<DeleteOutlined />} danger onClick={() => dispatch(clearAnalysis())} />
             </Tooltip>
-          </>
+          </Space>
         )}
       </div>
 
-      {/* Map + draw overlay wrapper */}
-      <div className="map-container" style={{ position: "relative" }}>
+      {/* Map + overlay wrapper */}
+      <div className="map-container" style={{ position: "relative", flex: 1, height: "100%" }}>
         <MapboxMap
           ref={mapHandle}
           drawMode={drawMode}
+          onMapReady={handleMapReady}
         />
 
-        {/* Polygon lasso overlay — sits above the map */}
+        {/* Polygon lasso overlay */}
         <DrawPolygonControl
           active={drawMode}
-          mapRef={{ current: mapHandle.current?.getMap() ?? null }}
+          mapRef={stableMapRef}
           onComplete={handlePolygonComplete}
           onCancel={() => dispatch(setDrawMode(false))}
         />
       </div>
 
-      {/* Right panel */}
       <AnalysisDrawer />
     </div>
   );
