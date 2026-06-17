@@ -30,7 +30,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { items, total, loading } = useAppSelector((s) => s.locations);
 
-  useEffect(() => { dispatch(fetchLocations()); }, [dispatch]);
+  useEffect(() => { dispatch(fetchLocations({})); }, [dispatch]);
 
   const approved = items.filter((l) => l.status === "approved").length;
   const inReview = items.filter((l) => l.status === "in_review").length;

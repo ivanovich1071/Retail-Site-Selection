@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { Input, Button, Tooltip, Space, message } from "antd";
 import {
-  SearchOutlined, LayersOutlined,
+  SearchOutlined, AppstoreOutlined,
   DeleteOutlined, SaveOutlined, EditOutlined,
 } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
@@ -120,7 +120,7 @@ export default function MapPage() {
         </Tooltip>
 
         <Tooltip title="Переключить слой">
-          <Button icon={<LayersOutlined />} onClick={() => dispatch(toggleLayer())}>
+          <Button icon={<AppstoreOutlined />} onClick={() => dispatch(toggleLayer())}>
             {LAYER_LABELS[activeLayer]}
           </Button>
         </Tooltip>

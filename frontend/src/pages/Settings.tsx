@@ -14,7 +14,7 @@ export default function Settings() {
   const [form] = Form.useForm();
 
   const onSave = (values: any) => {
-    const total = Object.values(values).reduce((a: any, b: any) => a + b, 0);
+    const total = Object.values(values).reduce((a: number, b: unknown) => a + (b as number), 0);
     if (Math.abs(total - 100) > 1) {
       message.error("Сумма весов должна быть равна 100%");
       return;
