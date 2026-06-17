@@ -1,6 +1,6 @@
 import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
-import { load } from "@2gis/mapgl";
-import type { Map, Marker } from "@2gis/mapgl/global";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
 import {
   setSelectedCoords, setAnalysisLoading, setAnalysisResult,
@@ -9,27 +9,46 @@ import {
 import { setAnalysisPanelOpen } from "../../store/uiSlice";
 import { analyzeByAddress } from "../../services/api";
 
-const TWOGIS_KEY = import.meta.env.VITE_TWOGIS_KEY as string;
+// Fix Leaflet default marker icons (broken by bundlers)
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
 
+// Leaflet-compatible map handle (mirrors previous 2GIS interface)
 export interface MapboxMapHandle {
-  getMap: () => Map | null;
+  getMap: () => L.Map | null;
 }
 
 interface Props {
-  onMapReady?: (map: Map) => void;
+  onMapReady?: (map: L.Map) => void;
   drawMode?: boolean;
 }
+
+const TILE_LAYERS = {
+  scheme:    "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  satellite: "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+  hybrid:    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+};
+
+const TILE_ATTRS = {
+  scheme:    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  satellite: "Tiles &copy; Esri",
+  hybrid:    "Tiles &copy; Esri",
+};
 
 const MapboxMap = forwardRef<MapboxMapHandle, Props>(function MapboxMap(
   { onMapReady, drawMode = false },
   ref,
 ) {
   const containerRef  = useRef<HTMLDivElement>(null);
-  const mapRef        = useRef<Map | null>(null);
-  const markerRef     = useRef<Marker | null>(null);
-  const isoLayersRef  = useRef<string[]>([]);
+  const mapRef        = useRef<L.Map | null>(null);
+  const tileLayerRef  = useRef<L.TileLayer | null>(null);
+  const markerRef     = useRef<L.Marker | null>(null);
+  const isoLayersRef  = useRef<L.Layer[]>([]);
   const drawModeRef   = useRef(drawMode);
-  const destroyedRef  = useRef(false);
 
   const dispatch = useAppDispatch();
   const { center, zoom, analysisResult, activeLayer } = useAppSelector((s) => s.map);
@@ -37,118 +56,102 @@ const MapboxMap = forwardRef<MapboxMapHandle, Props>(function MapboxMap(
   useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
   useImperativeHandle(ref, () => ({ getMap: () => mapRef.current }));
 
-  // ── Init map ──────────────────────────────────────────────────────
+  // ── Init map once ──────────────────────────────────────────────
   useEffect(() => {
-    if (mapRef.current || destroyedRef.current) return;
+    if (!containerRef.current || mapRef.current) return;
 
-    let cancelled = false;
-
-    load().then((mapgl) => {
-      if (cancelled || !containerRef.current || mapRef.current) return;
-
-      const map = new mapgl.Map(containerRef.current, {
-        center: center as [number, number],
-        zoom,
-        key: TWOGIS_KEY || "",
-        lang: "ru",
-      });
-
-      map.on("click", async (e: any) => {
-        if (drawModeRef.current) return;
-        const [lon, lat] = e.lngLat as [number, number];
-        dispatch(setSelectedCoords({ lon, lat }));
-        dispatch(setAnalysisLoading(true));
-        dispatch(setAnalysisPanelOpen(true));
-
-        if (markerRef.current) { markerRef.current.destroy(); }
-        markerRef.current = new mapgl.Marker(map, { coordinates: [lon, lat] });
-
-        try {
-          const result = await analyzeByAddress({
-            address: `${lat.toFixed(5)},${lon.toFixed(5)}`,
-            isochrone_minutes: [5, 10, 15],
-            include_huff: false,
-          });
-          dispatch(setAnalysisResult(result));
-        } catch (err: any) {
-          dispatch(setAnalysisError(err?.response?.data?.detail || "Ошибка анализа"));
-        }
-      });
-
-      map.on("moveend", () => {
-        const c = map.getCenter();
-        dispatch(setCenter([c[0], c[1]]));
-        dispatch(setZoom(map.getZoom()));
-      });
-
-      mapRef.current = map;
-      onMapReady?.(map);
-    }).catch((err) => {
-      console.error("2GIS MapGL load error:", err);
+    const map = L.map(containerRef.current, {
+      center: [center[1], center[0]] as [number, number], // Leaflet uses [lat, lon]
+      zoom,
+      zoomControl: true,
     });
 
+    // Base tile layer
+    const tile = L.tileLayer(TILE_LAYERS.scheme, {
+      attribution: TILE_ATTRS.scheme,
+      maxZoom: 19,
+    }).addTo(map);
+    tileLayerRef.current = tile;
+
+    map.on("click", async (e: L.LeafletMouseEvent) => {
+      if (drawModeRef.current) return;
+      const { lat, lng: lon } = e.latlng;
+      dispatch(setSelectedCoords({ lon, lat }));
+      dispatch(setAnalysisLoading(true));
+      dispatch(setAnalysisPanelOpen(true));
+
+      if (markerRef.current) markerRef.current.remove();
+      markerRef.current = L.marker([lat, lon]).addTo(map);
+
+      try {
+        const result = await analyzeByAddress({
+          address: `${lat.toFixed(5)},${lon.toFixed(5)}`,
+          isochrone_minutes: [5, 10, 15],
+          include_huff: false,
+        });
+        dispatch(setAnalysisResult(result));
+      } catch (err: any) {
+        dispatch(setAnalysisError(err?.response?.data?.detail || "Ошибка анализа"));
+      }
+    });
+
+    map.on("moveend", () => {
+      const c = map.getCenter();
+      dispatch(setCenter([c.lng, c.lat]));
+      dispatch(setZoom(map.getZoom()));
+    });
+
+    mapRef.current = map;
+    onMapReady?.(map);
+
     return () => {
-      cancelled = true;
+      map.remove();
+      mapRef.current = null;
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Cleanup on unmount ───────────────────────────────────────────
-  useEffect(() => {
-    return () => {
-      destroyedRef.current = true;
-      if (markerRef.current) { markerRef.current.destroy(); markerRef.current = null; }
-      if (mapRef.current)    { mapRef.current.destroy();    mapRef.current = null; }
-    };
-  }, []);
-
-  // ── Switch layer style ───────────────────────────────────────────
+  // ── Switch tile layer ─────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const STYLES: Record<string, string> = {
-      scheme:    "https://mapgl.2gis.com/api/styles/main",
-      satellite: "https://mapgl.2gis.com/api/styles/satellite",
-      hybrid:    "https://mapgl.2gis.com/api/styles/hybrid",
-    };
-    try { (map as any).setStyle?.(STYLES[activeLayer] ?? STYLES.scheme); } catch {}
+    if (tileLayerRef.current) { tileLayerRef.current.remove(); }
+    tileLayerRef.current = L.tileLayer(TILE_LAYERS[activeLayer] ?? TILE_LAYERS.scheme, {
+      attribution: TILE_ATTRS[activeLayer] ?? TILE_ATTRS.scheme,
+      maxZoom: 19,
+    }).addTo(map);
   }, [activeLayer]);
 
-  // ── Draw isochrone polygons ──────────────────────────────────────
+  // ── Draw isochrone polygons ───────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !analysisResult?.isochrones?.length) return;
+    if (!map) return;
 
-    isoLayersRef.current.forEach((id) => {
-      try { (map as any).removeLayer(id); } catch {}
-    });
+    isoLayersRef.current.forEach((l) => l.remove());
     isoLayersRef.current = [];
+
+    if (!analysisResult?.isochrones?.length) return;
 
     const colours = ["#27ae60", "#f39c12", "#e74c3c"];
     analysisResult.isochrones.forEach((iso: any, i: number) => {
       if (!iso.geometry?.coordinates) return;
-      const id = `iso-fill-${i}`;
-      try {
-        (map as any).addLayer({
-          id,
-          type: "polygon",
-          style: {
-            color: colours[i % colours.length],
-            opacity: 0.18,
-            strokeColor: colours[i % colours.length],
-            strokeWidth: 2,
-            strokeOpacity: 0.7,
-          },
-          geometry: iso.geometry.coordinates,
-        });
-        isoLayersRef.current.push(id);
-      } catch {}
+      // GeoJSON Polygon coords are [lon, lat], Leaflet wants [lat, lon]
+      const rings = iso.geometry.coordinates.map((ring: [number, number][]) =>
+        ring.map(([lon, lat]) => [lat, lon] as [number, number]),
+      );
+      const poly = L.polygon(rings, {
+        color: colours[i % colours.length],
+        weight: 2,
+        opacity: 0.8,
+        fillOpacity: 0.15,
+      }).addTo(map);
+      isoLayersRef.current.push(poly);
     });
   }, [analysisResult]);
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", minHeight: "500px" }}
+      style={{ width: "100%", height: "100%", minHeight: 500 }}
     />
   );
 });

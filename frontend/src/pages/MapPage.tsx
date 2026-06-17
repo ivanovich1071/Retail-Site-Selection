@@ -14,14 +14,14 @@ import { analyzeByAddress, analyzeByPolygon, createLocation } from "../services/
 import MapboxMap, { type MapboxMapHandle } from "../components/Map/MapboxMap";
 import DrawPolygonControl from "../components/Map/DrawPolygonControl";
 import AnalysisDrawer from "../components/Panels/AnalysisDrawer";
-import type { Map } from "@2gis/mapgl/global";
+import type L from "leaflet";
 
 export default function MapPage() {
   const dispatch   = useAppDispatch();
   const mapHandle  = useRef<MapboxMapHandle>(null);
 
   // Stable ref that DrawPolygonControl can use — updated via onMapReady
-  const stableMapRef = useRef<Map | null>(null);
+  const stableMapRef = useRef<L.Map | null>(null);
 
   const [address, setAddress]           = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
@@ -33,7 +33,7 @@ export default function MapPage() {
     scheme: "Схема", satellite: "Спутник", hybrid: "Гибрид",
   };
 
-  const handleMapReady = useCallback((map: Map) => {
+  const handleMapReady = useCallback((map: L.Map) => {
     stableMapRef.current = map;
   }, []);
 
