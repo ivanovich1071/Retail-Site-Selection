@@ -5,10 +5,11 @@ import { store } from "./store";
 import App from "./App";
 import "./styles/global.css";
 
+// StrictMode disabled: 2GIS MapGL is an imperative SDK that breaks
+// under StrictMode's double-mount behaviour (map.destroy() on cleanup
+// leaves the canvas in an unrecoverable state on re-mount).
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <Provider store={store}>
-      <App />
-    </Provider>
-  </React.StrictMode>
+  <Provider store={store}>
+    <App />
+  </Provider>
 );

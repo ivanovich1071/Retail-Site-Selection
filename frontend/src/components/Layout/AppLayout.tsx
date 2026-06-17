@@ -85,7 +85,10 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </Dropdown>
         </Header>
 
-        <Content style={{ margin: 0, overflow: "auto", flex: 1 }}>
+        <Content style={{
+          margin: 0, flex: 1, display: "flex", flexDirection: "column",
+          overflow: location.pathname === "/map" ? "hidden" : "auto",
+        }}>
           {children}
         </Content>
       </Layout>

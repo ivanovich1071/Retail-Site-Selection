@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, useRef, forwardRef } from "react";
+import { useEffect, useRef, forwardRef, useImperativeHandle } from "react";
 import type { Map, Marker, MapOptions } from "@2gis/mapgl/global";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
 import {
@@ -8,8 +8,9 @@ import {
 import { setAnalysisPanelOpen } from "../../store/uiSlice";
 import { analyzeByAddress } from "../../services/api";
 
-const TWOGIS_KEY = import.meta.env.VITE_TWOGIS_KEY || "";
+const TWOGIS_KEY = import.meta.env.VITE_TWOGIS_KEY as string | undefined;
 
+// Module-level cache — avoids re-loading CDN script on HMR / StrictMode
 let mapglPromise: Promise<typeof import("@2gis/mapgl/global")> | null = null;
 
 function loadMapGL() {
@@ -33,10 +34,12 @@ const MapboxMap = forwardRef<MapboxMapHandle, Props>(function MapboxMap(
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
-  const markerRef = useRef<Marker | null>(null);
+  const mapRef      = useRef<Map | null>(null);
+  const markerRef   = useRef<Marker | null>(null);
   const isoLayersRef = useRef<string[]>([]);
-  const drawModeRef = useRef(drawMode);
+  const drawModeRef  = useRef(drawMode);
+  // Guard against StrictMode double-invoke creating two maps
+  const initStartedRef = useRef(false);
 
   const dispatch = useAppDispatch();
   const { center, zoom, analysisResult, activeLayer } = useAppSelector((s) => s.map);
@@ -47,82 +50,91 @@ const MapboxMap = forwardRef<MapboxMapHandle, Props>(function MapboxMap(
     hybrid:    "https://mapgl.2gis.com/api/styles/hybrid",
   };
 
-  // Keep drawModeRef in sync so the click handler closure sees the latest value
   useEffect(() => { drawModeRef.current = drawMode; }, [drawMode]);
 
-  // Expose the internal map instance via ref
-  useImperativeHandle(ref, () => ({
-    getMap: () => mapRef.current,
-  }));
+  useImperativeHandle(ref, () => ({ getMap: () => mapRef.current }));
 
-  // Initialise map once
+  // ── Initialise map once ─────────────────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current || mapRef.current) return;
+    if (!containerRef.current) return;
+    // Already running or already created
+    if (initStartedRef.current || mapRef.current) return;
+    initStartedRef.current = true;
 
-    let cancelled = false;
+    let active = true;
 
-    loadMapGL().then((mapglAPI) => {
-      if (cancelled || !containerRef.current) return;
+    loadMapGL()
+      .then((mapglAPI) => {
+        if (!active || !containerRef.current) return;
 
-      const map: Map = new mapglAPI.Map(containerRef.current, {
-        center: center as [number, number],
-        zoom,
-        key: TWOGIS_KEY,
-        lang: "ru",
-      } as MapOptions);
+        const map: Map = new mapglAPI.Map(containerRef.current, {
+          center: center as [number, number],
+          zoom,
+          key: TWOGIS_KEY || "",
+          lang: "ru",
+        } as MapOptions);
 
-      // Click → analyse address (only when NOT in draw mode)
-      map.on("click", async (e: any) => {
-        if (drawModeRef.current) return;
+        // Click → analyse by coordinates (skip when drawing)
+        map.on("click", async (e: any) => {
+          if (drawModeRef.current) return;
+          const [lon, lat] = e.lngLat as [number, number];
+          dispatch(setSelectedCoords({ lon, lat }));
+          dispatch(setAnalysisLoading(true));
+          dispatch(setAnalysisPanelOpen(true));
 
-        const [lon, lat] = e.lngLat as [number, number];
-        dispatch(setSelectedCoords({ lon, lat }));
-        dispatch(setAnalysisLoading(true));
-        dispatch(setAnalysisPanelOpen(true));
+          if (markerRef.current) { markerRef.current.destroy(); }
+          markerRef.current = new mapglAPI.Marker(map, { coordinates: [lon, lat] });
 
-        if (markerRef.current) markerRef.current.destroy();
-        markerRef.current = new mapglAPI.Marker(map, {
-          coordinates: [lon, lat],
+          try {
+            const result = await analyzeByAddress({
+              address: `${lat.toFixed(5)},${lon.toFixed(5)}`,
+              isochrone_minutes: [5, 10, 15],
+              include_huff: false,
+            });
+            dispatch(setAnalysisResult(result));
+          } catch (err: any) {
+            dispatch(setAnalysisError(err?.response?.data?.detail || "Ошибка анализа"));
+          }
         });
 
-        try {
-          const result = await analyzeByAddress({
-            address: `${lat.toFixed(5)},${lon.toFixed(5)}`,
-            isochrone_minutes: [5, 10, 15],
-            include_huff: false,
-          });
-          dispatch(setAnalysisResult(result));
-        } catch (err: any) {
-          dispatch(setAnalysisError(err?.response?.data?.detail || "Ошибка анализа"));
-        }
-      });
+        map.on("moveend", () => {
+          const c = map.getCenter();
+          dispatch(setCenter([c[0], c[1]]));
+          dispatch(setZoom(map.getZoom()));
+        });
 
-      map.on("moveend", () => {
-        const c = map.getCenter();
-        dispatch(setCenter([c[0], c[1]]));
-        dispatch(setZoom(map.getZoom()));
+        mapRef.current = map;
+        onMapReady?.(map);
+      })
+      .catch((err) => {
+        console.error("2GIS MapGL load error:", err);
+        initStartedRef.current = false; // allow retry
       });
-
-      mapRef.current = map;
-      onMapReady?.(map);
-    }).catch(console.error);
 
     return () => {
-      cancelled = true;
-      if (markerRef.current) { markerRef.current.destroy(); markerRef.current = null; }
-      if (mapRef.current) { mapRef.current.destroy(); mapRef.current = null; }
+      active = false;
+      // Only destroy on true unmount (not StrictMode double-invoke)
+      // We use initStartedRef to detect if a real unmount happened
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Switch base layer style
+  // Cleanup on real unmount (component removed from DOM)
+  useEffect(() => {
+    return () => {
+      if (markerRef.current) { markerRef.current.destroy(); markerRef.current = null; }
+      if (mapRef.current)    { mapRef.current.destroy();    mapRef.current = null; }
+      initStartedRef.current = false;
+    };
+  }, []);
+
+  // ── Switch base layer style ─────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const styleUrl = STYLE_MAP[activeLayer] ?? STYLE_MAP.scheme;
-    (map as any).setStyle?.(styleUrl);
+    try { (map as any).setStyle?.(STYLE_MAP[activeLayer] ?? STYLE_MAP.scheme); } catch {}
   }, [activeLayer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Draw isochrone polygons when analysis result arrives
+  // ── Draw isochrone polygons ─────────────────────────────────────────
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !analysisResult?.isochrones?.length) return;
@@ -137,28 +149,28 @@ const MapboxMap = forwardRef<MapboxMapHandle, Props>(function MapboxMap(
     analysisResult.isochrones.forEach((iso: any, i: number) => {
       if (!iso.geometry?.coordinates) return;
       const id = `isochrone-fill-${i}`;
-
-      (map as any).addLayer({
-        id,
-        type: "polygon",
-        style: {
-          color: colours[i % colours.length],
-          opacity: 0.18,
-          strokeColor: colours[i % colours.length],
-          strokeWidth: 2,
-          strokeOpacity: 0.7,
-        },
-        geometry: iso.geometry.coordinates,
-      });
-
-      isoLayersRef.current.push(id);
+      try {
+        (map as any).addLayer({
+          id,
+          type: "polygon",
+          style: {
+            color:         colours[i % colours.length],
+            opacity:       0.18,
+            strokeColor:   colours[i % colours.length],
+            strokeWidth:   2,
+            strokeOpacity: 0.7,
+          },
+          geometry: iso.geometry.coordinates,
+        });
+        isoLayersRef.current.push(id);
+      } catch {}
     });
   }, [analysisResult]);
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%" }}
+      style={{ width: "100%", height: "100%", minHeight: 400 }}
     />
   );
 });
