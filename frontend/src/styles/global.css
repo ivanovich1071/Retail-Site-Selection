@@ -1,0 +1,26 @@
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, Arial, sans-serif;
+  background: #f0f2f5;
+  color: #222;
+}
+
+#root { height: 100vh; display: flex; flex-direction: column; }
+
+/* 2GIS MapGL overrides */
+canvas { outline: none; }
+.mapgl-copyright { opacity: 0.7; }
+
+/* Score badge colours */
+.score-high  { color: #27ae60; font-weight: 700; }
+.score-mid   { color: #f39c12; font-weight: 700; }
+.score-low   { color: #e74c3c; font-weight: 700; }
+
+/* Full-height map page */
+.map-page { position: relative; flex: 1; display: flex; overflow: hidden; }
+.map-container { flex: 1; height: 100%; }
+
+/* Analysis drawer */
+.analysis-drawer .ant-drawer-body { padding: 16px; overflow-y: auto; }

@@ -1,0 +1,32 @@
+# Environment — NEVER commit real keys
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/dist/
+
+# Uploads / generated files
+uploads/
+*.pdf
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Docker
+*.log
