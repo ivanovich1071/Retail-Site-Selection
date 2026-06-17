@@ -1,68 +1,73 @@
-/**
- * DrawPolygonControl — SVG overlay for freehand polygon drawing on the map.
- *
- * Usage:
- *   - active=true  → capture clicks, draw polygon
- *   - Single click → add vertex
- *   - Double-click → close polygon, call onComplete with GeoJSON Polygon
- *   - Escape or onCancel → discard
- *
- * The component sits on top of the map div. To convert pixel→geo coords
- * it calls mapRef.current.unproject([x, y]) from 2GIS MapGL.
- */
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button, Tooltip } from "antd";
 import { CloseOutlined, CheckOutlined } from "@ant-design/icons";
+import L from "leaflet";
 
 interface Props {
   active: boolean;
-  mapRef: React.MutableRefObject<any | null>;
+  mapRef: React.MutableRefObject<L.Map | null>;
   onComplete: (polygon: GeoJSON.Polygon) => void;
   onCancel: () => void;
 }
 
 interface Point {
-  x: number;  // screen pixel
+  x: number;
   y: number;
   lon: number;
   lat: number;
 }
 
 export default function DrawPolygonControl({ active, mapRef, onComplete, onCancel }: Props) {
-  const svgRef = useRef<SVGSVGElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [points, setPoints] = useState<Point[]>([]);
-  const [mouse, setMouse] = useState<{ x: number; y: number } | null>(null);
+  const svgRef       = useRef<SVGSVGElement>(null);
+  const pointsRef    = useRef<Point[]>([]);           // authoritative store
+  const [points, setPoints]   = useState<Point[]>([]); // for rendering only
+  const [mouse, setMouse]     = useState<{ x: number; y: number } | null>(null);
 
-  // Convert container-relative pixel to geo using 2GIS MapGL unproject
-  const pixelToGeo = useCallback((x: number, y: number): [number, number] | null => {
+  const pixelToGeo = (x: number, y: number): [number, number] | null => {
     const map = mapRef.current;
-    if (!map) return null;
+    if (!map || !containerRef.current) return null;
     try {
-      const geo = map.unproject([x, y]);
-      return geo as [number, number]; // [lon, lat]
-    } catch {
-      return null;
-    }
-  }, [mapRef]);
+      const rect = containerRef.current.getBoundingClientRect();
+      const latlng = map.containerPointToLatLng(
+        L.point(x, y - (rect.top - (map.getContainer()?.getBoundingClientRect().top ?? 0)))
+      );
+      return [latlng.lng, latlng.lat];
+    } catch { return null; }
+  };
 
-  const getRelativePos = (e: React.MouseEvent | MouseEvent) => {
+  const getPos = (e: MouseEvent) => {
     const rect = containerRef.current?.getBoundingClientRect();
     if (!rect) return null;
     return { x: e.clientX - rect.left, y: e.clientY - rect.top };
   };
 
+  const reset = useCallback(() => {
+    pointsRef.current = [];
+    setPoints([]);
+    setMouse(null);
+  }, []);
+
+  const closePolygon = useCallback(() => {
+    const pts = pointsRef.current;
+    if (pts.length < 3) return;
+    const coords = pts.map((p) => [p.lon, p.lat] as [number, number]);
+    coords.push(coords[0]);
+    onComplete({ type: "Polygon", coordinates: [coords] });
+    reset();
+  }, [onComplete, reset]);
+
+  // All handlers use refs — no dependency on `points` state
   const handleClick = useCallback((e: MouseEvent) => {
     if (!active) return;
     e.stopPropagation();
-    const pos = getRelativePos(e);
+    const pos = getPos(e);
     if (!pos) return;
 
-    // Close polygon on click near first point (within 12px)
-    if (points.length >= 3) {
-      const first = points[0];
-      const dist = Math.hypot(pos.x - first.x, pos.y - first.y);
-      if (dist < 14) {
+    const pts = pointsRef.current;
+    if (pts.length >= 3) {
+      const first = pts[0];
+      if (Math.hypot(pos.x - first.x, pos.y - first.y) < 14) {
         closePolygon();
         return;
       }
@@ -70,68 +75,52 @@ export default function DrawPolygonControl({ active, mapRef, onComplete, onCance
 
     const geo = pixelToGeo(pos.x, pos.y);
     if (!geo) return;
-    setPoints((prev) => [...prev, { x: pos.x, y: pos.y, lon: geo[0], lat: geo[1] }]);
-  }, [active, points, pixelToGeo]);
+    const newPts = [...pts, { x: pos.x, y: pos.y, lon: geo[0], lat: geo[1] }];
+    pointsRef.current = newPts;
+    setPoints([...newPts]);
+  }, [active, closePolygon]); // no `points` dep!
 
   const handleDblClick = useCallback((e: MouseEvent) => {
-    if (!active || points.length < 3) return;
+    if (!active || pointsRef.current.length < 3) return;
     e.stopPropagation();
     e.preventDefault();
     closePolygon();
-  }, [active, points]);
+  }, [active, closePolygon]);
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!active) return;
-    const pos = getRelativePos(e);
+    const pos = getPos(e);
     if (pos) setMouse(pos);
   }, [active]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     if (e.key === "Escape") { reset(); onCancel(); }
-    if ((e.key === "Enter" || e.key === "Return") && points.length >= 3) closePolygon();
-  }, [points, onCancel]);
-
-  function closePolygon() {
-    if (points.length < 3) return;
-    const coords = points.map((p) => [p.lon, p.lat] as [number, number]);
-    coords.push(coords[0]); // close ring
-    onComplete({ type: "Polygon", coordinates: [coords] });
-    reset();
-  }
-
-  function reset() {
-    setPoints([]);
-    setMouse(null);
-  }
+    if ((e.key === "Enter" || e.key === "Return") && pointsRef.current.length >= 3) closePolygon();
+  }, [reset, onCancel, closePolygon]);
 
   useEffect(() => {
     if (!active) { reset(); return; }
-
     const el = containerRef.current;
     if (!el) return;
     el.addEventListener("click", handleClick);
     el.addEventListener("dblclick", handleDblClick);
     el.addEventListener("mousemove", handleMouseMove);
     window.addEventListener("keydown", handleKeyDown);
-
     return () => {
       el.removeEventListener("click", handleClick);
       el.removeEventListener("dblclick", handleDblClick);
       el.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [active, handleClick, handleDblClick, handleMouseMove, handleKeyDown]);
+  }, [active, handleClick, handleDblClick, handleMouseMove, handleKeyDown, reset]);
 
-  // Build SVG path from current points + rubber-band line to mouse
-  const allPoints = mouse && points.length > 0
+  const allPts = mouse && points.length > 0
     ? [...points.map((p) => [p.x, p.y]), [mouse.x, mouse.y]]
     : points.map((p) => [p.x, p.y]);
 
-  const polylineD = allPoints.length > 1
-    ? allPoints.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ")
+  const polylineD = allPts.length > 1
+    ? allPts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ")
     : "";
-
-  const polygonPoints = points.map((p) => `${p.x},${p.y}`).join(" ");
 
   if (!active) return null;
 
@@ -139,9 +128,8 @@ export default function DrawPolygonControl({ active, mapRef, onComplete, onCance
     <div
       ref={containerRef}
       style={{
-        position: "absolute", inset: 0, zIndex: 5,
-        cursor: points.length >= 3 ? "crosshair" : "crosshair",
-        userSelect: "none",
+        position: "absolute", inset: 0, zIndex: 500,
+        cursor: "crosshair", userSelect: "none",
       }}
     >
       <svg
@@ -149,18 +137,15 @@ export default function DrawPolygonControl({ active, mapRef, onComplete, onCance
         width="100%" height="100%"
         style={{ position: "absolute", inset: 0, pointerEvents: "none" }}
       >
-        {/* Filled polygon (closed area) */}
         {points.length >= 3 && (
           <polygon
-            points={polygonPoints}
-            fill="rgba(26, 82, 118, 0.18)"
+            points={points.map((p) => `${p.x},${p.y}`).join(" ")}
+            fill="rgba(26,82,118,0.15)"
             stroke="#1a5276"
             strokeWidth={2}
             strokeDasharray="6 3"
           />
         )}
-
-        {/* Rubber-band line */}
         {polylineD && (
           <path
             d={polylineD}
@@ -168,39 +153,35 @@ export default function DrawPolygonControl({ active, mapRef, onComplete, onCance
             stroke="#1a5276"
             strokeWidth={1.5}
             strokeDasharray="6 3"
-            opacity={0.8}
+            opacity={0.85}
           />
         )}
-
-        {/* Vertex circles */}
         {points.map((p, i) => (
           <circle
             key={i}
             cx={p.x} cy={p.y} r={i === 0 ? 7 : 5}
             fill={i === 0 ? "#e74c3c" : "#1a5276"}
             stroke="#fff" strokeWidth={2}
-            style={{ cursor: i === 0 && points.length >= 3 ? "pointer" : "default" }}
           />
         ))}
       </svg>
 
-      {/* Control buttons — top-right corner */}
       <div style={{
         position: "absolute", top: 8, right: 8,
-        display: "flex", gap: 6, flexDirection: "column",
+        display: "flex", gap: 6, flexDirection: "column", zIndex: 501,
       }}>
         <div style={{
           background: "#1a5276", color: "#fff",
           borderRadius: 6, padding: "6px 10px",
-          fontSize: 12, textAlign: "center", maxWidth: 180,
+          fontSize: 12, textAlign: "center", maxWidth: 200,
         }}>
           {points.length === 0 && "Кликайте на карте чтобы добавить точки"}
           {points.length === 1 && "Добавьте ещё точки"}
-          {points.length === 2 && "Добавьте ещё точку"}
-          {points.length >= 3 && `${points.length} точек · Двойной клик или ↵ чтобы завершить`}
+          {points.length === 2 && "Добавьте ещё одну точку"}
+          {points.length >= 3 && `${points.length} точек · Двойной клик или ↵ завершить`}
         </div>
         {points.length >= 3 && (
-          <Tooltip title="Завершить полигон (Enter)">
+          <Tooltip title="Завершить (Enter)">
             <Button
               type="primary" icon={<CheckOutlined />} size="small"
               onClick={(e) => { e.stopPropagation(); closePolygon(); }}
