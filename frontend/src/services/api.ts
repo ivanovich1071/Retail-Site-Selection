@@ -1,7 +1,9 @@
 import axios from "axios";
 
+// Use relative path so Vite proxy handles CORS in dev;
+// in production a reverse proxy (nginx) serves the same origin.
 export const api = axios.create({
-  baseURL: (import.meta.env.VITE_API_URL || "http://localhost:8000") + "/api/v1",
+  baseURL: "/api/v1",
   timeout: 30000,
 });
 
