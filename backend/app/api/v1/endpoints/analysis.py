@@ -1,12 +1,19 @@
+import asyncio
+import json
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi.responses import StreamingResponse
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import get_db
+from backend.app.core.database import get_db, AsyncSessionLocal
 from backend.app.core.exceptions import GeocodeError, IsochroneError
+from backend.app.models.analysis_job import AnalysisJob, AnalysisJobStatus
 from backend.app.schemas.analysis import (
     AnalysisByAddressRequest, AnalysisByPolygonRequest, AnalysisResult, ScoringBreakdown,
+    AnalysisJobCreate, AnalysisJobResponse, AnalysisJobList,
 )
 from backend.app.services.geocode import GeocodeService
 from backend.app.services.isochrone import IsochroneService
@@ -14,9 +21,12 @@ from backend.app.services.scoring import ScoringService
 from backend.app.services.huff import HuffService
 from backend.app.integrations.twogis_client import TwoGISClient
 from backend.app.services.demographics import get_demographics_service
+from backend.app.orchestrator.analysis_orchestrator import run_analysis_job
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+TERMINAL_STATUSES = {AnalysisJobStatus.completed.value, AnalysisJobStatus.failed.value}
 
 
 @router.post("/by-address", response_model=AnalysisResult)
@@ -241,3 +251,106 @@ async def analyze_by_polygon(
         huff_market_share=huff_result,
         cannibalization_risk=None,
     )
+
+
+# ── Job-based analysis (stage pipeline + progress) ──────────────────
+
+@router.post("/start", response_model=AnalysisJobResponse, status_code=202)
+async def start_analysis(
+    body: AnalysisJobCreate,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    """Create an analysis job and run the pipeline asynchronously."""
+    if not body.address and not body.polygon:
+        raise HTTPException(status_code=422, detail="Either address or polygon is required")
+
+    job = AnalysisJob(
+        location_id=body.location_id,
+        status=AnalysisJobStatus.queued,
+        progress_pct=0,
+        input_params=body.model_dump(exclude_none=True),
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+
+    # Run after the response is sent (TestClient waits for background tasks).
+    background.add_task(run_analysis_job, job.id)
+    return job
+
+
+@router.get("/jobs", response_model=AnalysisJobList)
+async def list_jobs(
+    location_id: Optional[int] = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+):
+    query = select(AnalysisJob)
+    if location_id is not None:
+        query = query.where(AnalysisJob.location_id == location_id)
+
+    total = (await db.execute(select(func.count()).select_from(query.subquery()))).scalar()
+    query = query.order_by(AnalysisJob.created_at.desc()).limit(limit)
+    rows = (await db.execute(query)).scalars().all()
+    return {"items": rows, "total": total}
+
+
+@router.get("/jobs/{job_id}", response_model=AnalysisJobResponse)
+async def get_job(job_id: int, db: AsyncSession = Depends(get_db)):
+    job = await db.get(AnalysisJob, job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    return job
+
+
+@router.post("/jobs/{job_id}/recalculate", response_model=AnalysisJobResponse, status_code=202)
+async def recalculate_job(
+    job_id: int,
+    background: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
+):
+    src = await db.get(AnalysisJob, job_id)
+    if not src:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+
+    job = AnalysisJob(
+        location_id=src.location_id,
+        status=AnalysisJobStatus.queued,
+        progress_pct=0,
+        input_params=src.input_params,
+    )
+    db.add(job)
+    await db.commit()
+    await db.refresh(job)
+    background.add_task(run_analysis_job, job.id)
+    return job
+
+
+@router.get("/jobs/{job_id}/stream")
+async def stream_job(job_id: int):
+    """Server-sent events: stream job status until a terminal state."""
+    async def event_generator():
+        last_payload = None
+        for _ in range(600):  # ~10 min cap at 1s interval
+            async with AsyncSessionLocal() as db:
+                job = await db.get(AnalysisJob, job_id)
+                if not job:
+                    yield f"event: error\ndata: {json.dumps({'detail': 'not found'})}\n\n"
+                    return
+                payload = {
+                    "id": job.id,
+                    "status": job.status.value if hasattr(job.status, "value") else job.status,
+                    "progress_pct": job.progress_pct,
+                    "current_stage": job.current_stage,
+                    "error_message": job.error_message,
+                }
+                status_val = payload["status"]
+            if payload != last_payload:
+                yield f"data: {json.dumps(payload)}\n\n"
+                last_payload = payload
+            if status_val in TERMINAL_STATUSES:
+                return
+            await asyncio.sleep(1)
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")

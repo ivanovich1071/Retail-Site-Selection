@@ -5,6 +5,8 @@ import AppLayout from "./components/Layout/AppLayout";
 import Dashboard from "./pages/Dashboard";
 import MapPage from "./pages/MapPage";
 import LocationsList from "./pages/LocationsList";
+import LocationDetail from "./pages/LocationDetail";
+import AnalysisPage from "./pages/AnalysisPage";
 import BatchUpload from "./pages/BatchUpload";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
@@ -18,8 +20,10 @@ function ProtectedRoutes() {
     <AppLayout>
       <Routes>
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/analysis" element={<AnalysisPage />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/locations" element={<LocationsList />} />
+        <Route path="/locations/:id" element={<LocationDetail />} />
         <Route path="/batch" element={<BatchUpload />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />

@@ -11,6 +11,8 @@ celery_app = Celery(
         "backend.app.tasks.huff_tasks",
         "backend.app.tasks.report_tasks",
         "backend.app.tasks.demographics_tasks",
+        "backend.app.tasks.poi_tasks",
+        "backend.app.tasks.analysis_tasks",
     ],
 )
 
@@ -28,6 +30,8 @@ celery_app.conf.update(
         "backend.app.tasks.huff_tasks.*": {"queue": "analysis"},
         "backend.app.tasks.report_tasks.*": {"queue": "reports"},
         "demographics.*": {"queue": "analysis"},
+        "poi.*": {"queue": "batch"},
+        "analysis.*": {"queue": "analysis"},
     },
     beat_schedule={
         # Refresh all regional demographics on 1st of each month at 03:00 Minsk time

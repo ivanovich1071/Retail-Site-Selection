@@ -1,7 +1,10 @@
+import asyncio
 import logging
 from typing import List, Dict, Any
 
 from backend.app.integrations.openrouteservice_client import OpenRouteServiceClient
+from backend.app.core.exceptions import IsochroneError
+from backend.app.services.isochrone_osmnx import fallback_isochrones
 
 logger = logging.getLogger(__name__)
 
@@ -18,8 +21,11 @@ class IsochroneService:
         mode: str = "walk",
     ) -> Dict[str, Any]:
         """
-        Returns ORS GeoJSON FeatureCollection.
-        mode: walk | drive
+        Returns a GeoJSON FeatureCollection of isochrone polygons.
+        Primary source is OpenRouteService; on failure (rate limit, no key,
+        network error) falls back to OSMnx/radius approximation so the pipeline
+        always has reachability geometry.
+        mode: walk | drive | bike
         """
         if minutes is None:
             minutes = [5, 10, 15]
@@ -30,7 +36,13 @@ class IsochroneService:
             "bike": "cycling-regular",
         }
         profile = profile_map.get(mode, "foot-walking")
-        return await self.ors.get_isochrones(lon, lat, minutes, profile)
+
+        try:
+            return await self.ors.get_isochrones(lon, lat, minutes, profile)
+        except IsochroneError as e:
+            logger.warning("ORS isochrones failed (%s); using fallback", e)
+            # OSMnx / radius work is sync and CPU/IO bound — run in a thread.
+            return await asyncio.to_thread(fallback_isochrones, lon, lat, minutes, mode)
 
     async def get_travel_times_to_competitors(
         self,

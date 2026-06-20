@@ -159,6 +159,76 @@ async def analyze_by_polygon(request: Request):
     }
 
 
+# ── Job-based analysis stub ──────────────────────────────
+_STUB_JOBS: dict = {}
+_STUB_JOB_SEQ = [0]
+
+
+def _stub_result(address, lat=53.9006, lon=27.5615):
+    return {
+        "address": address, "latitude": lat, "longitude": lon, "building_polygon": None,
+        "isochrones": [
+            {"minutes": 5, "geometry": {"type": "Polygon", "coordinates": [[[27.55, 53.89], [27.57, 53.89], [27.57, 53.91], [27.55, 53.91], [27.55, 53.89]]]}, "area_sqkm": 0.8, "population": 3200},
+            {"minutes": 10, "geometry": {"type": "Polygon", "coordinates": [[[27.54, 53.88], [27.58, 53.88], [27.58, 53.92], [27.54, 53.92], [27.54, 53.88]]]}, "area_sqkm": 2.5, "population": 9800},
+        ],
+        "competitors_nearby": [
+            {"id": 1, "brand_name": "Евроопт", "store_format": "supermarket", "distance_m": 320, "latitude": 53.903, "longitude": 27.565},
+        ],
+        "population_in_isochrone": {"5min": 3200, "10min": 9800},
+        "avg_salary": 1620.0,
+        "scoring": {"total_score": 74.5, "score_demographics": 81.2, "score_competitors": 75.0, "score_accessibility": 68.0, "score_visibility": 70.0, "score_location": 70.0, "details": {}},
+        "huff_market_share": 0.083, "cannibalization_risk": None,
+    }
+
+
+@app.post("/api/v1/analysis/start", status_code=202)
+async def stub_start_analysis(request: Request):
+    body = await request.json()
+    _STUB_JOB_SEQ[0] += 1
+    jid = _STUB_JOB_SEQ[0]
+    address = body.get("address") or "Нарисованная зона"
+    job = {
+        "id": jid, "location_id": body.get("location_id"), "status": "completed",
+        "progress_pct": 100, "current_stage": "Готово", "error_message": None,
+        "result": _stub_result(address),
+        "created_at": "2026-06-20T12:00:00", "started_at": "2026-06-20T12:00:01",
+        "completed_at": "2026-06-20T12:00:05",
+    }
+    _STUB_JOBS[jid] = job
+    return job
+
+
+@app.get("/api/v1/analysis/jobs")
+async def stub_list_jobs(location_id: int = None, limit: int = 50):
+    items = list(_STUB_JOBS.values())
+    if location_id is not None:
+        items = [j for j in items if j["location_id"] == location_id]
+    return {"items": items[:limit], "total": len(items)}
+
+
+@app.get("/api/v1/analysis/jobs/{job_id}")
+async def stub_get_job(job_id: int):
+    return _STUB_JOBS.get(job_id, {"detail": "Analysis job not found"})
+
+
+@app.post("/api/v1/analysis/jobs/{job_id}/recalculate", status_code=202)
+async def stub_recalc(job_id: int):
+    _STUB_JOB_SEQ[0] += 1
+    jid = _STUB_JOB_SEQ[0]
+    src = _STUB_JOBS.get(job_id, {})
+    job = {**src, "id": jid, "status": "completed", "progress_pct": 100}
+    _STUB_JOBS[jid] = job
+    return job
+
+
+@app.patch("/api/v1/locations/{location_id}/status")
+async def stub_update_status(location_id: int, request: Request):
+    body = await request.json()
+    loc = next((dict(loc) for loc in STUB_LOCATIONS if loc["id"] == location_id), dict(STUB_LOCATIONS[0]))
+    loc["status"] = body.get("status", loc["status"])
+    return loc
+
+
 # ── Batch stub ───────────────────────────────────────────
 @app.get("/api/v1/batch")
 async def list_batch():

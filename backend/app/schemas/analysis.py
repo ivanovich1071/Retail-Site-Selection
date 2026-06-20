@@ -61,3 +61,48 @@ class ScoringBreakdown(BaseModel):
 
 
 AnalysisResult.model_rebuild()
+
+
+# ── Job-based analysis ──────────────────────────────────────────────
+
+class AnalysisJobCreate(BaseModel):
+    address: Optional[str] = None
+    polygon: Optional[Dict[str, Any]] = None
+    area_sqm: Optional[float] = Field(None, ge=10, le=100000)
+    parking_spaces: Optional[int] = Field(None, ge=0)
+    visibility_score: Optional[float] = Field(None, ge=0, le=10)
+    isochrone_minutes: List[int] = [5, 10, 15]
+    include_huff: bool = True
+    location_id: Optional[int] = None
+
+
+class AnalysisJobResponse(BaseModel):
+    id: int
+    location_id: Optional[int]
+    status: str
+    progress_pct: int
+    current_stage: Optional[str]
+    error_message: Optional[str]
+    result: Optional[Dict[str, Any]]
+    created_at: Optional[Any]
+    started_at: Optional[Any]
+    completed_at: Optional[Any]
+
+    model_config = {"from_attributes": True}
+
+
+class AnalysisJobSummary(BaseModel):
+    id: int
+    location_id: Optional[int]
+    status: str
+    progress_pct: int
+    current_stage: Optional[str]
+    created_at: Optional[Any]
+    completed_at: Optional[Any]
+
+    model_config = {"from_attributes": True}
+
+
+class AnalysisJobList(BaseModel):
+    items: List[AnalysisJobSummary]
+    total: int

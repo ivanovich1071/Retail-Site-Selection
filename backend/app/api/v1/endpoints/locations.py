@@ -10,10 +10,22 @@ from backend.app.core.database import get_db
 from backend.app.core.config import settings
 from backend.app.models.location import Location
 from backend.app.models.scoring_result import ScoringResult
-from backend.app.schemas.location import LocationCreate, LocationUpdate, LocationOut, LocationListOut, ScoringResultOut
+from backend.app.schemas.location import (
+    LocationCreate, LocationUpdate, LocationOut, LocationListOut,
+    ScoringResultOut, LocationStatusUpdate,
+)
 from backend.app.api.v1.endpoints.auth import get_current_user
 
 router = APIRouter()
+
+# Allowed status transitions for the approval workflow.
+STATUS_TRANSITIONS = {
+    "draft": {"in_review"},
+    "in_review": {"approved", "rejected"},
+    "rejected": {"draft", "in_review"},
+    "approved": {"opened", "in_review"},
+    "opened": set(),
+}
 
 
 def _to_out(loc: Location) -> dict:
@@ -98,6 +110,34 @@ async def delete_location(
         raise HTTPException(status_code=404, detail="Location not found")
     await db.delete(loc)
     await db.commit()
+
+
+@router.patch("/{location_id}/status", response_model=LocationOut)
+async def update_location_status(
+    location_id: int,
+    body: LocationStatusUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_current_user),
+):
+    loc = await db.get(Location, location_id)
+    if not loc:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    current = loc.status.value if hasattr(loc.status, "value") else str(loc.status)
+    allowed = STATUS_TRANSITIONS.get(current, set())
+    if body.status not in allowed:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Недопустимый переход: {current} → {body.status}. Разрешено: {sorted(allowed)}",
+        )
+
+    loc.status = body.status
+    if body.comment:
+        prefix = f"[{body.status}] {body.comment}"
+        loc.notes = f"{prefix}\n{loc.notes}" if loc.notes else prefix
+    await db.commit()
+    await db.refresh(loc)
+    return _to_out(loc)
 
 
 @router.post("/{location_id}/photo")

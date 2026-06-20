@@ -1,7 +1,7 @@
 import { Layout, Menu, Avatar, Dropdown, Button, Typography } from "antd";
 import {
   DashboardOutlined, EnvironmentOutlined, UnorderedListOutlined,
-  UploadOutlined, FileTextOutlined, SettingOutlined,
+  UploadOutlined, FileTextOutlined, SettingOutlined, ThunderboltOutlined,
   MenuFoldOutlined, MenuUnfoldOutlined, UserOutlined, LogoutOutlined,
 } from "@ant-design/icons";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -15,6 +15,7 @@ const { Text } = Typography;
 
 const menuItems = [
   { key: "/dashboard",  icon: <DashboardOutlined />,      label: "Дашборд" },
+  { key: "/analysis",   icon: <ThunderboltOutlined />,    label: "Новый анализ" },
   { key: "/map",        icon: <EnvironmentOutlined />,    label: "Карта" },
   { key: "/locations",  icon: <UnorderedListOutlined />,  label: "Объекты" },
   { key: "/batch",      icon: <UploadOutlined />,         label: "Пакетная загрузка" },

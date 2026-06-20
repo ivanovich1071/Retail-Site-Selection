@@ -365,9 +365,33 @@ P(i,j) = (A_j^α / T_ij^β) / Σ_k (A_k^α / T_ik^β)
 - Frontend: полноценная страница Reports (таблица объектов + генерация PDF)
 - Stub-сервер main_local.py для разработки без БД
 - Docker Compose (postgres, redis, backend, celery, celery-beat, frontend)
-- 14 backend-тестов (pytest)
 - MCP-серверы: Google Maps, OpenStreetMap (в .claude/settings.local.json)
 - GitHub: https://github.com/ivanovich1071/Retail-Site-Selection
+
+### ✅ Реализовано (v2 — Phase 1–3)
+**Phase 1 — Core Infrastructure:**
+- Миграция 0001 переписана под модели (был дрейф); 0002 (h3_cells), 0003 (analysis_jobs)
+- CI/CD: GitHub Actions (ruff + pytest + tsc), шаг alembic перед тестами
+- `/health` с проверкой DB + Redis + uptime
+- Config API (`/config/scoring-weights`) + рабочая страница Settings
+- Frontend: loading/empty/error states (Dashboard, Locations, Batch)
+- 53 backend-теста: unit (scoring/huff/batch/h3/poi) + integration (auth/locations/analysis/jobs)
+- `bcrypt==4.0.1`, Docker postgres на порту 5433, ruff.toml
+
+**Phase 2 — Spatial Foundation:**
+- H3-модуль (`spatial/h3_indexing.py`) + HexAggregator + H3 API (polyfill/cell/neighbors)
+- Isochrone fallback (`isochrone_osmnx.py`): ORS → OSMnx → radius-буфер
+- POI ingestion pipeline (`spatial/poi_pipeline.py`): Overpass → normalize → dedupe → competitors
+- Celery-задача `poi.ingest_area`
+- Frontend: H3 hex-слой на карте (`HexLayer.tsx`) с тогглом
+
+**Phase 3 — Location Object Analysis:**
+- Модель `AnalysisJob` + stage-based orchestrator (`orchestrator/analysis_orchestrator.py`)
+- API: `POST /analysis/start`, `GET /analysis/jobs[/{id}]`, `recalculate`, SSE `/stream`
+- In-process dispatch (BackgroundTasks) — работает без Celery; есть Celery-задача `analysis.run_job`
+- Approve/Reject workflow: `PATCH /locations/{id}/status` с валидацией переходов
+- Frontend: New Analysis page (scenario switcher), Location Detail (вкладки + approve/reject),
+  JobProgress + useJobProgress hook, AnalysisResultView
 
 ### 🔲 Планируется (v2, по фазам — см. раздел 12)
 **Phase 1** — Core Infrastructure hardening

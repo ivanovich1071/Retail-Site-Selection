@@ -42,6 +42,11 @@ class LocationOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class LocationStatusUpdate(BaseModel):
+    status: str  # in_review | approved | rejected | draft
+    comment: Optional[str] = None
+
+
 class LocationListOut(BaseModel):
     items: List[LocationOut]
     total: int
