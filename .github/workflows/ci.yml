@@ -40,7 +40,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r backend/requirements.txt
       - name: Lint
-        run: pip install ruff && ruff check backend/ --select E,F,W
+        run: pip install ruff && ruff check backend/
+      - name: Run migrations
+        env:
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          POSTGRES_DB: retail_test_db
+          POSTGRES_USER: retail_user
+          POSTGRES_PASSWORD: test_password
+          SECRET_KEY: test-secret-key-for-ci
+        run: python -m alembic -c backend/migrations/alembic.ini upgrade head
       - name: Test
         env:
           POSTGRES_HOST: localhost

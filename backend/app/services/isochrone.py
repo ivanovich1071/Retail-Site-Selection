@@ -2,7 +2,6 @@ import logging
 from typing import List, Dict, Any
 
 from backend.app.integrations.openrouteservice_client import OpenRouteServiceClient
-from backend.app.core.exceptions import IsochroneError
 
 logger = logging.getLogger(__name__)
 

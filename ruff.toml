@@ -1,0 +1,11 @@
+# Lint config — focus on correctness (pyflakes F), not stylistic line length.
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+# E501 (line length) and E741 (ambiguous name) are stylistic — not worth gating CI.
+ignore = ["E501", "E741"]
+
+[lint.per-file-ignores]
+# __init__.py re-exports models/schemas for side effects (Alembic, router wiring).
+"__init__.py" = ["F401"]

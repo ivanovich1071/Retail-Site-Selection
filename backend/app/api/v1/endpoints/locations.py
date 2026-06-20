@@ -3,14 +3,12 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from geoalchemy2.functions import ST_AsGeoJSON
-import json
 import os
 import shutil
 
 from backend.app.core.database import get_db
 from backend.app.core.config import settings
-from backend.app.models.location import Location, LocationStatus
+from backend.app.models.location import Location
 from backend.app.models.scoring_result import ScoringResult
 from backend.app.schemas.location import LocationCreate, LocationUpdate, LocationOut, LocationListOut, ScoringResultOut
 from backend.app.api.v1.endpoints.auth import get_current_user

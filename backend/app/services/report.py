@@ -5,7 +5,6 @@ from typing import Dict, Any
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

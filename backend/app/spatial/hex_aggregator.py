@@ -3,8 +3,7 @@
 from typing import List, Dict, Any
 
 from backend.app.spatial.h3_indexing import (
-    lat_lon_to_h3, h3_to_center, polygon_to_h3_cells,
-    get_resolution_area_km2, DEFAULT_RESOLUTION,
+    lat_lon_to_h3, h3_to_center, get_resolution_area_km2, DEFAULT_RESOLUTION,
 )
 
 

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Float, Integer, ForeignKey, DateTime, JSON, String
+from sqlalchemy import Float, ForeignKey, DateTime, JSON, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 

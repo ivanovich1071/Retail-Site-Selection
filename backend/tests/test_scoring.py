@@ -1,4 +1,3 @@
-import pytest
 from backend.app.services.scoring import ScoringService
 
 

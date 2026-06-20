@@ -3,7 +3,6 @@ from datetime import datetime
 
 from backend.celery_worker import celery_app
 from backend.app.services.batch_processor import BatchProcessor
-from backend.app.services.geocode import GeocodeService
 from backend.app.services.scoring import ScoringService
 
 logger = logging.getLogger(__name__)
@@ -49,7 +48,7 @@ def process_batch(self, batch_job_id: int, file_path: str):
                 import httpx
                 from backend.app.core.config import settings as cfg
 
-                lon, lat = None, None
+                _lon, _lat = None, None
                 try:
                     r = httpx.get(
                         "https://geocode-maps.yandex.ru/1.x/",
@@ -64,7 +63,7 @@ def process_batch(self, batch_job_id: int, file_path: str):
                     features = r.json()["response"]["GeoObjectCollection"]["featureMember"]
                     if features:
                         pos = features[0]["GeoObject"]["Point"]["pos"].split()
-                        lon, lat = float(pos[0]), float(pos[1])
+                        _lon, _lat = float(pos[0]), float(pos[1])
                 except Exception:
                     pass
 

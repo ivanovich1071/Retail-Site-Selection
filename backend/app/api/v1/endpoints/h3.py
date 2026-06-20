@@ -4,7 +4,7 @@ from typing import List
 from backend.app.schemas.h3 import H3PolyfillRequest, H3PolyfillResponse, H3CellData
 from backend.app.spatial.h3_indexing import (
     polygon_to_h3_cells, h3_to_geojson, h3_to_center,
-    get_neighbors, cells_to_geojson_features,
+    get_neighbors,
 )
 
 router = APIRouter()

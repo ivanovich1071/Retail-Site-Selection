@@ -27,7 +27,7 @@ def refresh_demographics_all(self):
     Pull current year + 2 prior years for all registered regions from Belstat.
     Runs monthly; safe to trigger manually.
     """
-    from app.services.demographics import get_demographics_service
+    from backend.app.services.demographics import get_demographics_service
 
     current_year = date.today().year
     years = [current_year - 2, current_year - 1, current_year]
@@ -51,7 +51,7 @@ def refresh_demographics_all(self):
 )
 def refresh_demographics_region(self, region_codes: list[str]):
     """Refresh a specific subset of regions (e.g., just Minsk districts)."""
-    from app.services.demographics import get_demographics_service
+    from backend.app.services.demographics import get_demographics_service
 
     current_year = date.today().year
     years = [current_year - 1, current_year]

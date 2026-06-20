@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
-from app.integrations.belstat_client import (
+from backend.app.integrations.belstat_client import (
     BelstatClient,
     BelstatError,
     DEFAULT_REGION_CODES,
@@ -177,7 +177,7 @@ class DemographicsService:
         if self._db is None:
             return
         try:
-            from app.models.demographics import DemographicsZone
+            from backend.app.models.demographics import DemographicsZone
             from sqlalchemy import select
 
             for code, year_data in pop.items():
