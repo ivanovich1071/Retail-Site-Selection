@@ -77,3 +77,20 @@ export const generateReport = (locationId: number) =>
 
 export const downloadReportUrl = (locationId: number) =>
   `${api.defaults.baseURL}/reports/${locationId}/download`;
+
+// ── Config ──────────────────────────────────────────────
+export const getConfig = () =>
+  api.get("/config/scoring-weights").then((r) => r.data);
+
+export const updateConfig = (body: Record<string, any>) =>
+  api.patch("/config/scoring-weights", body).then((r) => r.data);
+
+// ── H3 Spatial ──────────────────────────────────────────
+export const h3Polyfill = (polygon: GeoJSON.Polygon, resolution = 9) =>
+  api.post("/h3/polyfill", { polygon, resolution }).then((r) => r.data);
+
+export const h3GetCell = (h3Index: string) =>
+  api.get(`/h3/cell/${h3Index}`).then((r) => r.data);
+
+export const h3GetNeighbors = (h3Index: string, k = 1) =>
+  api.get(`/h3/neighbors/${h3Index}`, { params: { k } }).then((r) => r.data);
