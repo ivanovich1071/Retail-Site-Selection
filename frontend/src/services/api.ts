@@ -45,15 +45,55 @@ export const analyzeByPolygon = (payload: {
   include_huff?: boolean;
 }) => api.post("/analysis/by-polygon", payload).then((r) => r.data);
 
+// ── Job-based analysis ────────────────────────────────────
+export interface AnalysisJob {
+  id: number;
+  location_id: number | null;
+  status: string;
+  progress_pct: number;
+  current_stage: string | null;
+  error_message: string | null;
+  result: any | null;
+  created_at?: string;
+  started_at?: string;
+  completed_at?: string;
+}
+
+export const startAnalysis = (payload: {
+  address?: string;
+  polygon?: GeoJSON.Polygon;
+  area_sqm?: number;
+  parking_spaces?: number;
+  visibility_score?: number;
+  isochrone_minutes?: number[];
+  include_huff?: boolean;
+  location_id?: number;
+}) => api.post<AnalysisJob>("/analysis/start", payload).then((r) => r.data);
+
+export const getAnalysisJob = (jobId: number) =>
+  api.get<AnalysisJob>(`/analysis/jobs/${jobId}`).then((r) => r.data);
+
+export const listAnalysisJobs = (params?: { location_id?: number; limit?: number }) =>
+  api.get("/analysis/jobs", { params }).then((r) => r.data);
+
+export const recalculateJob = (jobId: number) =>
+  api.post<AnalysisJob>(`/analysis/jobs/${jobId}/recalculate`).then((r) => r.data);
+
 // ── Locations ─────────────────────────────────────────────
 export const getLocations = (params?: Record<string, any>) =>
   api.get("/locations", { params }).then((r) => r.data);
+
+export const getLocation = (id: number) =>
+  api.get(`/locations/${id}`).then((r) => r.data);
 
 export const createLocation = (body: Record<string, any>) =>
   api.post("/locations", body).then((r) => r.data);
 
 export const updateLocation = (id: number, body: Record<string, any>) =>
   api.patch(`/locations/${id}`, body).then((r) => r.data);
+
+export const updateLocationStatus = (id: number, status: string, comment?: string) =>
+  api.patch(`/locations/${id}/status`, { status, comment }).then((r) => r.data);
 
 export const deleteLocation = (id: number) => api.delete(`/locations/${id}`);
 

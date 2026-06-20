@@ -1,6 +1,7 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Table, Tag, Button, Select, Space, Typography, Popconfirm, message, Tooltip, Empty } from "antd";
-import { DeleteOutlined, FileTextOutlined, ReloadOutlined } from "@ant-design/icons";
+import { DeleteOutlined, FileTextOutlined, ReloadOutlined, EyeOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchLocations, deleteLocation, setPage } from "../store/locationSlice";
 import { generateReport } from "../services/api";
@@ -23,6 +24,7 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function LocationsList() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { items, total, page, loading, error } = useAppSelector((s) => s.locations);
 
   useEffect(() => { dispatch(fetchLocations({ page })); }, [dispatch, page]);
@@ -66,6 +68,9 @@ export default function LocationsList() {
       title: "Действия", key: "actions",
       render: (_: any, record: any) => (
         <Space>
+          <Tooltip title="Открыть карточку">
+            <Button icon={<EyeOutlined />} size="small" onClick={() => navigate(`/locations/${record.id}`)} />
+          </Tooltip>
           <Tooltip title="Генерировать отчёт">
             <Button icon={<FileTextOutlined />} size="small" onClick={() => handleReport(record.id)} />
           </Tooltip>

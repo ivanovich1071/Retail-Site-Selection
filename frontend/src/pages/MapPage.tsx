@@ -13,6 +13,7 @@ import { setAnalysisPanelOpen } from "../store/uiSlice";
 import { analyzeByAddress, analyzeByPolygon, createLocation } from "../services/api";
 import MapboxMap, { type MapboxMapHandle } from "../components/Map/MapboxMap";
 import DrawPolygonControl from "../components/Map/DrawPolygonControl";
+import HexLayer from "../components/Map/HexLayer";
 import AnalysisDrawer from "../components/Panels/AnalysisDrawer";
 import type L from "leaflet";
 
@@ -26,6 +27,8 @@ export default function MapPage() {
   const [address, setAddress]           = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [saveLoading, setSaveLoading]     = useState(false);
+  const [mapInstance, setMapInstance]     = useState<L.Map | null>(null);
+  const [hexVisible, setHexVisible]       = useState(false);
 
   const { analysisResult, activeLayer, drawMode } = useAppSelector((s) => s.map);
 
@@ -35,6 +38,7 @@ export default function MapPage() {
 
   const handleMapReady = useCallback((map: L.Map) => {
     stableMapRef.current = map;
+    setMapInstance(map);
   }, []);
 
   // ── Address search ────────────────────────────────────────────
@@ -133,6 +137,16 @@ export default function MapPage() {
           </Button>
         </Tooltip>
 
+        <Tooltip title="H3-сетка (гексагоны) для пространственного анализа">
+          <Button
+            icon={<AppstoreOutlined />}
+            type={hexVisible ? "primary" : "default"}
+            onClick={() => setHexVisible((v) => !v)}
+          >
+            H3-сетка
+          </Button>
+        </Tooltip>
+
         {analysisResult && !drawMode && (
           <Space>
             <Tooltip title="Сохранить объект">
@@ -152,6 +166,9 @@ export default function MapPage() {
           drawMode={drawMode}
           onMapReady={handleMapReady}
         />
+
+        {/* H3 hex grid overlay */}
+        <HexLayer map={mapInstance} visible={hexVisible} />
 
         {/* Polygon lasso overlay */}
         <DrawPolygonControl
