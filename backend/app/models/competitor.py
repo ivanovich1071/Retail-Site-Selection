@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Optional
 
 from geoalchemy2 import Geometry
-from sqlalchemy import String, DateTime, Float, Integer
+from sqlalchemy import String, DateTime, Float
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 

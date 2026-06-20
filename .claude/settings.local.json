@@ -7,5 +7,18 @@
       "Bash(curl -s \"https://dataportal.belstat.gov.by/osids-public-api/sdmx-api/indicator/datastructure/SDMX-JSON/10101100003\")",
       "Bash(python -c ' *)"
     ]
+  },
+  "mcpServers": {
+    "google-maps": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-google-maps"],
+      "env": {
+        "GOOGLE_MAPS_API_KEY": "AIzaSyAHv8rXTFT0CzkdkcUoM6yj7J_NlSNwa0Y"
+      }
+    },
+    "openstreetmap": {
+      "command": "npx",
+      "args": ["-y", "@cyanheads/openstreetmap-mcp-server"]
+    }
   }
 }

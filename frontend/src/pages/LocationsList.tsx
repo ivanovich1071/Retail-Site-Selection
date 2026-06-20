@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { Table, Tag, Button, Select, Space, Typography, Popconfirm, message, Tooltip } from "antd";
-import { DeleteOutlined, EyeOutlined, FileTextOutlined } from "@ant-design/icons";
+import { Table, Tag, Button, Select, Space, Typography, Popconfirm, message, Tooltip, Empty } from "antd";
+import { DeleteOutlined, FileTextOutlined, ReloadOutlined } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchLocations, deleteLocation, setPage } from "../store/locationSlice";
 import { generateReport } from "../services/api";
@@ -23,13 +23,21 @@ const STATUS_COLOR: Record<string, string> = {
 
 export default function LocationsList() {
   const dispatch = useAppDispatch();
-  const { items, total, page, loading } = useAppSelector((s) => s.locations);
+  const { items, total, page, loading, error } = useAppSelector((s) => s.locations);
 
   useEffect(() => { dispatch(fetchLocations({ page })); }, [dispatch, page]);
 
+  useEffect(() => {
+    if (error) message.error(`Ошибка загрузки списка: ${error}`);
+  }, [error]);
+
   const handleDelete = async (id: number) => {
-    await dispatch(deleteLocation(id));
-    message.success("Объект удалён");
+    try {
+      await dispatch(deleteLocation(id)).unwrap();
+      message.success("Объект удалён");
+    } catch {
+      message.error("Не удалось удалить объект");
+    }
   };
 
   const handleReport = async (id: number) => {
@@ -86,6 +94,17 @@ export default function LocationsList() {
         dataSource={items}
         rowKey="id"
         loading={loading}
+        locale={{
+          emptyText: error ? (
+            <Empty description="Ошибка загрузки">
+              <Button icon={<ReloadOutlined />} onClick={() => dispatch(fetchLocations({ page }))}>
+                Повторить
+              </Button>
+            </Empty>
+          ) : (
+            <Empty description="Объектов не найдено" />
+          ),
+        }}
         pagination={{
           current: page,
           pageSize: 20,

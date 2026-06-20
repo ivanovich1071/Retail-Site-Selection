@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from backend.app.api.v1 import api_router
 from backend.app.core.config import settings
-from backend.app.core.database import engine, AsyncSessionLocal
+from backend.app.core.database import AsyncSessionLocal
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)

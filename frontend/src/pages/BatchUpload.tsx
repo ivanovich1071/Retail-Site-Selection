@@ -28,6 +28,8 @@ export default function BatchUpload() {
     try {
       const data = await getBatchJobs();
       setJobs(data);
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || "Не удалось загрузить задачи");
     } finally {
       setJobsLoading(false);
     }
@@ -59,8 +61,13 @@ export default function BatchUpload() {
 
   const handleSelectJob = async (job: any) => {
     setSelectedJob(job);
-    const data = await getBatchResults(job.id);
-    setResults(data.results);
+    try {
+      const data = await getBatchResults(job.id);
+      setResults(data.results);
+    } catch (err: any) {
+      message.error(err?.response?.data?.detail || "Не удалось загрузить результаты");
+      setResults([]);
+    }
   };
 
   const jobColumns = [

@@ -1,10 +1,9 @@
 import logging
 import os
-from typing import List, Dict
+from typing import List
 
 import pandas as pd
 
-from backend.app.core.config import settings
 
 logger = logging.getLogger(__name__)
 

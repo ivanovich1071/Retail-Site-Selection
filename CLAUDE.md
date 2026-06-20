@@ -235,7 +235,7 @@ retail-geoai/
 ### Backend (`.env`)
 ```env
 POSTGRES_HOST=localhost          # "postgres" в Docker
-POSTGRES_PORT=5432
+POSTGRES_PORT=5433               # хост-порт Docker postgres (5432 занят локальным Windows PostgreSQL)
 POSTGRES_DB=retail_db
 POSTGRES_USER=retail_user
 POSTGRES_PASSWORD=secure_password
@@ -657,17 +657,34 @@ P(i,j) = (A_j^α / T_ij^β) / Σ_k (A_k^α / T_ik^β)
 ## 14. Тестирование
 
 ```bash
-# Backend
-.venv/Scripts/pytest backend/tests -v
+# Backend — unit + integration (37 тестов)
+.venv/Scripts/python -m pytest backend/tests -v
 
 # Frontend
 cd frontend && npx tsc --noEmit
+
+# Lint (конфиг в ruff.toml: select E,F,W; ignore E501,E741)
+ruff check backend/
 
 # E2E (планируется)
 npx playwright test
 ```
 
-Покрытые модули: `ScoringService`, `HuffService`, `BatchProcessor`.
+**Unit-тесты** (без БД): `ScoringService`, `HuffService`, `BatchProcessor`, H3-модуль.
+
+**Integration-тесты** (`backend/tests/test_api_*.py`, нужен PostgreSQL+PostGIS):
+- TestClient + asyncpg на тестовой БД `retail_test_db`.
+- `conftest.py`: на Windows ставит `WindowsSelectorEventLoopPolicy` (иначе asyncpg
+  падает с `WinError 64`), переопределяет `get_db` на NullPool-engine.
+- Если БД недоступна — DB-тесты пропускаются (`requires_db`), unit-тесты идут.
+- Внешние API (2GIS, ORS) мокаются через `unittest.mock.AsyncMock`.
+
+> ⚠️ `bcrypt` закреплён на `4.0.1` — `passlib` 1.7.4 несовместим с `bcrypt>=4.1`
+> (auth-эндпоинты падают на проверке длины пароля).
+
+> ⚠️ Alembic на Windows падает с `UnicodeDecodeError` (psycopg2 + русская локаль).
+> Обход: генерировать SQL через `alembic upgrade head --sql` и применять
+> `docker exec retail_postgres psql`. В CI (Linux) `alembic upgrade head` работает напрямую.
 
 ---
 

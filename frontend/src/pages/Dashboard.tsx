@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
-import { Card, Row, Col, Statistic, Typography, List, Tag, Spin } from "antd";
+import { useEffect } from "react";
+import { Card, Row, Col, Statistic, Typography, List, Tag, Skeleton, Empty, Button, message } from "antd";
 import {
   EnvironmentOutlined, CheckCircleOutlined,
-  ClockCircleOutlined, RiseOutlined,
+  ClockCircleOutlined, RiseOutlined, ReloadOutlined,
 } from "@ant-design/icons";
 import { useAppDispatch, useAppSelector } from "../hooks/redux";
 import { fetchLocations } from "../store/locationSlice";
@@ -28,9 +28,13 @@ function statusLabel(status: string) {
 export default function Dashboard() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const { items, total, loading } = useAppSelector((s) => s.locations);
+  const { items, total, loading, error } = useAppSelector((s) => s.locations);
 
   useEffect(() => { dispatch(fetchLocations({})); }, [dispatch]);
+
+  useEffect(() => {
+    if (error) message.error(`Не удалось загрузить данные: ${error}`);
+  }, [error]);
 
   const approved = items.filter((l) => l.status === "approved").length;
   const inReview = items.filter((l) => l.status === "in_review").length;
@@ -67,7 +71,19 @@ export default function Dashboard() {
       </Row>
 
       <Card title="Последние объекты" extra={<a onClick={() => navigate("/locations")}>Все объекты</a>}>
-        {loading ? <Spin /> : (
+        {loading ? (
+          <Skeleton active paragraph={{ rows: 6 }} />
+        ) : error ? (
+          <Empty description="Ошибка загрузки данных">
+            <Button icon={<ReloadOutlined />} onClick={() => dispatch(fetchLocations({}))}>
+              Повторить
+            </Button>
+          </Empty>
+        ) : items.length === 0 ? (
+          <Empty description="Пока нет объектов">
+            <Button type="primary" onClick={() => navigate("/map")}>Создать первый объект</Button>
+          </Empty>
+        ) : (
           <List
             dataSource={items.slice(0, 8)}
             renderItem={(item) => (

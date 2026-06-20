@@ -1,6 +1,5 @@
 """Tests for H3 spatial indexing module."""
 
-import pytest
 from backend.app.spatial.h3_indexing import (
     lat_lon_to_h3,
     h3_to_center,

@@ -78,7 +78,7 @@ async def create_location(request: Request):
 
 @app.patch("/api/v1/locations/{location_id}")
 async def update_location(location_id: int, request: Request):
-    body = await request.json()
+    await request.json()
     return STUB_LOCATIONS[0]
 
 @app.delete("/api/v1/locations/{location_id}", status_code=204)
