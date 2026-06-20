@@ -62,3 +62,6 @@ factory-boy==3.3.0
 # Linting
 ruff==0.4.7
 mypy==1.10.0
+
+# Spatial indexing
+h3>=4.1.0

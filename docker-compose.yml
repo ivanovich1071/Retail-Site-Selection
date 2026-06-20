@@ -4,6 +4,7 @@ services:
   postgres:
     image: postgis/postgis:15-3.4
     container_name: retail_postgres
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-retail_db}
       POSTGRES_USER: ${POSTGRES_USER:-retail_user}
@@ -21,6 +22,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: retail_redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -36,6 +38,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: retail_backend
+    restart: unless-stopped
     env_file: .env
     environment:
       POSTGRES_HOST: postgres
@@ -59,6 +62,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: retail_celery
+    restart: unless-stopped
     env_file: .env
     environment:
       POSTGRES_HOST: postgres
@@ -80,6 +84,7 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: retail_celery_beat
+    restart: unless-stopped
     env_file: .env
     environment:
       REDIS_HOST: redis

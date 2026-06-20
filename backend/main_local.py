@@ -212,3 +212,62 @@ async def get_demo_region(region_code: str):
 @app.post("/api/v1/demographics/refresh")
 async def trigger_demo_refresh():
     return {"updated": 0, "failed": 0, "message": "Stub mode: no real refresh. Run scripts/belstat_import.py instead."}
+
+
+# ── Config stub ──────────────────────────────────────────
+STUB_CONFIG = {
+    "scoring_weights": {"demographics": 0.30, "competitors": 0.25, "accessibility": 0.20, "visibility": 0.15, "location": 0.10},
+    "huff_params": {"beta": 2.0, "cannibalization_radius_m": 800},
+}
+
+@app.get("/api/v1/config/scoring-weights")
+async def get_config():
+    return STUB_CONFIG
+
+@app.patch("/api/v1/config/scoring-weights")
+async def update_config(request: Request):
+    body = await request.json()
+    if "scoring_weights" in body:
+        STUB_CONFIG["scoring_weights"].update(body["scoring_weights"])
+    if "huff_params" in body:
+        STUB_CONFIG["huff_params"].update(body["huff_params"])
+    return STUB_CONFIG
+
+
+# ── H3 stub ──────────────────────────────────────────────
+@app.post("/api/v1/h3/polyfill")
+async def h3_polyfill(request: Request):
+    try:
+        from backend.app.spatial.h3_indexing import polygon_to_h3_cells, h3_to_center, h3_to_geojson
+        body = await request.json()
+        polygon = body.get("polygon", {})
+        resolution = body.get("resolution", 9)
+        cells = polygon_to_h3_cells(polygon, resolution)
+        cell_data = []
+        features = []
+        for cell in cells[:200]:
+            lat, lon = h3_to_center(cell)
+            geom = h3_to_geojson(cell)
+            cell_data.append({"h3_index": cell, "resolution": resolution, "center_lat": lat, "center_lon": lon, "population": 0, "density_per_sqkm": 0, "competitor_count": 0, "geometry": geom})
+            features.append({"type": "Feature", "properties": {"h3_index": cell}, "geometry": geom})
+        return {"cells": cell_data, "total_cells": len(cells), "resolution": resolution, "geojson": {"type": "FeatureCollection", "features": features}}
+    except ImportError:
+        return {"cells": [], "total_cells": 0, "resolution": 9, "geojson": {"type": "FeatureCollection", "features": []}}
+
+@app.get("/api/v1/h3/cell/{h3_index}")
+async def h3_cell(h3_index: str):
+    try:
+        from backend.app.spatial.h3_indexing import h3_to_center, h3_to_geojson
+        lat, lon = h3_to_center(h3_index)
+        return {"h3_index": h3_index, "resolution": 9, "center_lat": lat, "center_lon": lon, "population": 0, "density_per_sqkm": 0, "competitor_count": 0, "geometry": h3_to_geojson(h3_index)}
+    except ImportError:
+        return {"h3_index": h3_index, "resolution": 9, "center_lat": 0, "center_lon": 0}
+
+@app.get("/api/v1/h3/neighbors/{h3_index}")
+async def h3_neighbors(h3_index: str, k: int = 1):
+    try:
+        from backend.app.spatial.h3_indexing import get_neighbors, h3_to_center, h3_to_geojson
+        cells = get_neighbors(h3_index, k)
+        return [{"h3_index": c, "resolution": 9, "center_lat": h3_to_center(c)[0], "center_lon": h3_to_center(c)[1], "geometry": h3_to_geojson(c)} for c in cells]
+    except ImportError:
+        return []
