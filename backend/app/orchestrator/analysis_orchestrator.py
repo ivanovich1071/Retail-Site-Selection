@@ -6,6 +6,7 @@ existing domain services (geocode, isochrone, scoring, huff) and the 2GIS
 competitor client — the same logic as the synchronous /analysis/by-address
 endpoint, but checkpointed and resumable from the DB.
 """
+import asyncio
 import logging
 import statistics
 from datetime import datetime, timezone
@@ -93,6 +94,7 @@ class AnalysisOrchestrator:
                     "population_in_isochrone": {
                         f"{iz['minutes']}min": iz.get("population") or 0 for iz in isochrone_data
                     },
+                    "population_10min": population,
                     "avg_salary": 1620.0,
                     "scoring": {**score_data, "details": {}},
                     "huff_market_share": huff_share,
@@ -107,7 +109,9 @@ class AnalysisOrchestrator:
                 await self._fail(db, job, f"Геокодирование не удалось: {e}")
             except Exception as e:  # noqa: BLE001
                 logger.exception("AnalysisJob %s failed", job_id)
-                await self._fail(db, job, str(e)[:500])
+                # str(e) can be empty (e.g. CancelledError) — fall back to type name.
+                detail = str(e).strip() or type(e).__name__
+                await self._fail(db, job, detail[:500])
 
     # ── Stage helpers ───────────────────────────────────────────────
 
@@ -157,6 +161,9 @@ class AnalysisOrchestrator:
                         "latitude": point.get("lat", 0),
                         "longitude": point.get("lon", 0),
                     })
+        except asyncio.CancelledError:
+            asyncio.current_task().uncancel()
+            logger.warning("Competitor search timed out/cancelled; continuing without competitors")
         except Exception as e:  # noqa: BLE001
             logger.warning("Competitor search failed: %s", e)
         return out

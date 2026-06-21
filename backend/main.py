@@ -9,12 +9,14 @@ from sqlalchemy import text
 from backend.app.api.v1 import api_router
 from backend.app.core.config import settings
 from backend.app.core.database import AsyncSessionLocal
+from backend.app.core.logging_config import setup_logging
+from backend.app.core.request_logging import RequestLoggingMiddleware
 from backend.app.observability.metrics import (
     MetricsMiddleware, render_metrics, CONTENT_TYPE_LATEST,
 )
 from backend.app.events.handlers import register_default_handlers
 
-logging.basicConfig(level=settings.LOG_LEVEL)
+setup_logging()
 logger = logging.getLogger(__name__)
 
 
@@ -36,6 +38,7 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    app.add_middleware(RequestLoggingMiddleware)
     if settings.METRICS_ENABLED:
         app.add_middleware(MetricsMiddleware)
 

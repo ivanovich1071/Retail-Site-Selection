@@ -33,3 +33,4 @@ uploads/
 belstat_pop.json
 belstat_import_result.json
 .claude/settings.local.json
+logs/

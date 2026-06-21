@@ -3,7 +3,6 @@ import logging
 from typing import List, Dict, Any
 
 from backend.app.integrations.openrouteservice_client import OpenRouteServiceClient
-from backend.app.core.exceptions import IsochroneError
 from backend.app.services.isochrone_osmnx import fallback_isochrones
 
 logger = logging.getLogger(__name__)
@@ -39,7 +38,12 @@ class IsochroneService:
 
         try:
             return await self.ors.get_isochrones(lon, lat, minutes, profile)
-        except IsochroneError as e:
+        except asyncio.CancelledError:
+            # aiohttp connect timeouts surface as CancelledError (BaseException).
+            asyncio.current_task().uncancel()
+            logger.warning("ORS isochrones timed out/cancelled; using fallback")
+            return await asyncio.to_thread(fallback_isochrones, lon, lat, minutes, mode)
+        except Exception as e:  # noqa: BLE001 — incl. IsochroneError, network errors
             logger.warning("ORS isochrones failed (%s); using fallback", e)
             # OSMnx / radius work is sync and CPU/IO bound — run in a thread.
             return await asyncio.to_thread(fallback_isochrones, lon, lat, minutes, mode)
