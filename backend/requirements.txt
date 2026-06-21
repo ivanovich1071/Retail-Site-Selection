@@ -66,3 +66,14 @@ mypy==1.10.0
 
 # Spatial indexing
 h3>=4.1.0
+
+# ML platform (optional — pipeline degrades to ridge/heuristic without these)
+# catboost>=1.2
+# shap>=0.45
+# scikit-learn>=1.4
+
+# Observability (optional — falls back to in-process metrics)
+prometheus-client>=0.20.0
+
+# Competition graph (optional — falls back to adjacency dict)
+# networkx>=3.2

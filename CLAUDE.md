@@ -413,17 +413,37 @@ P(i,j) = (A_j^α / T_ij^β) / Σ_k (A_k^α / T_ik^β)
 - `feature_store/registry.py` — метаданные + версионирование (14 фич)
 - `feature_store/pipeline.py` — сборка вектора + Redis-кэш (best-effort)
 - API: `/features/{registry,vector}`
-- 34 новых unit-теста (test_competition/mobility/feature_store), всего 68 backend-тестов
+
+**Phase 7 — ML Platform:**
+- `ml/feature_pipeline.py` — canonical 14-фичевый вектор (build_dataset)
+- `ml/training.py` — CatBoost (optional) ИЛИ closed-form ridge fallback, persist JSON/.cbm
+- `ml/inference.py` — prediction + cold-start эвристика; `ml/explainability.py` — SHAP (optional) ИЛИ perturbation
+- API: `/ml/{predict,explain,train}`
+
+**Phase 8 — AI Orchestrator + MCP:**
+- `integrations/openrouter_client.py` — OpenRouter (Qwen, tool-calling, через `OPENROUTER_API_KEY`)
+- `mcp/retail_mcp_server.py` — tools: huff/score/cannibalization/white-space + JSON-схемы
+- `mcp/mcp_router.py` — диспетчер с envelope {ok,result|error}, fault-tolerant
+- `orchestrator/ai_agent.py` — ReAct-цикл tool-calling + детерминированный fallback без ключа
+- API: `/ai/{chat,action,tools,context/{id}}` (AI НЕ изменяет данные)
+
+**Phase 9 — Heatmap + Scenario Simulation:**
+- `simulation/scenarios.py` — competitor_opening/closing, parking, economic_shock, visibility (before/after delta)
+- API: `/analytics/heatmap` (GeoJSON по white_space/saturation/density), `/analytics/simulation/run`
+
+**Phase 10 — Event-Driven Architecture:**
+- `events/event_bus.py` — Redis Streams + in-process fallback; events: location.created, score.changed, competitor.added, mobility.updated
+- `events/handlers.py` — регистрация хендлеров на startup; API: `/events/{publish,recent}`
+
+**Phase 11 — Observability:**
+- `observability/metrics.py` — Prometheus (optional) ИЛИ in-process counters/latency, MetricsMiddleware
+- `/metrics` endpoint (Prometheus text format)
+- 51 новый unit-тест (ml/ai/simulation/events+metrics/competition/mobility/feature_store); всего 112 backend-тестов
 
 ### 🔲 Планируется (v2, по фазам — см. раздел 12)
 **Phase 1** — Core Infrastructure hardening
 **Phase 2** — Spatial Foundation (H3, isochrone engine, POI ingestion)
 **Phase 3** — Location Object Analysis (job-based workflow, catchment)
-**Phase 7** — ML Platform (CatBoost, SHAP, MLflow)
-**Phase 8** — AI Orchestrator (LangGraph, MCP tools, AI drawer)
-**Phase 9** — Heatmap + Scenario Simulation
-**Phase 10** — Event-Driven Architecture (Kafka)
-**Phase 11** — Observability (Prometheus, Grafana, Loki)
 **Phase 12** — Production Hardening (RBAC, audit, HA, CDN)
 
 ---

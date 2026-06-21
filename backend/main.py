@@ -1,7 +1,7 @@
 import logging
 import time
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from sqlalchemy import text
@@ -9,6 +9,10 @@ from sqlalchemy import text
 from backend.app.api.v1 import api_router
 from backend.app.core.config import settings
 from backend.app.core.database import AsyncSessionLocal
+from backend.app.observability.metrics import (
+    MetricsMiddleware, render_metrics, CONTENT_TYPE_LATEST,
+)
+from backend.app.events.handlers import register_default_handlers
 
 logging.basicConfig(level=settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -32,12 +36,19 @@ def create_application() -> FastAPI:
         allow_headers=["*"],
     )
     app.add_middleware(GZipMiddleware, minimum_size=1000)
+    if settings.METRICS_ENABLED:
+        app.add_middleware(MetricsMiddleware)
 
     app.include_router(api_router, prefix="/api/v1")
 
     @app.on_event("startup")
     async def startup_event():
         logger.info("Application startup — connecting to database")
+        register_default_handlers()
+
+    @app.get("/metrics", tags=["System"])
+    async def metrics_endpoint():
+        return Response(content=render_metrics(), media_type=CONTENT_TYPE_LATEST)
 
     @app.on_event("shutdown")
     async def shutdown_event():

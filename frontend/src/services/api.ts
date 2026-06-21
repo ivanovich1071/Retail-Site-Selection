@@ -167,3 +167,39 @@ export const featureRegistry = (group?: string) =>
 
 export const buildFeatureVector = (raw: Record<string, any>, entity_id?: string) =>
   api.post("/features/vector", { raw, entity_id }).then((r) => r.data);
+
+// ── ML Platform (Phase 7) ───────────────────────────────
+export const mlPredict = (raw: Record<string, any>) =>
+  api.post("/ml/predict", { raw }).then((r) => r.data);
+
+export const mlExplain = (raw: Record<string, any>, top_k = 8) =>
+  api.post("/ml/explain", { raw, top_k }).then((r) => r.data.result);
+
+export const mlTrain = (rows: Record<string, any>[], targets: number[]) =>
+  api.post("/ml/train", { rows, targets }).then((r) => r.data);
+
+// ── AI Orchestrator (Phase 8) ───────────────────────────
+export const aiChat = (message: string, context?: any, history?: any[]) =>
+  api.post("/ai/chat", { message, context, history }).then((r) => r.data);
+
+export const aiAction = (tool: string, args: Record<string, any>) =>
+  api.post("/ai/action", { tool, args }).then((r) => r.data);
+
+export const aiTools = () => api.get("/ai/tools").then((r) => r.data);
+
+export const aiContext = (locationId: number) =>
+  api.get(`/ai/context/${locationId}`).then((r) => r.data);
+
+// ── Analytics: heatmap + simulation (Phase 9) ───────────
+export const analyticsHeatmap = (cells: any[], metric = "white_space") =>
+  api.post("/analytics/heatmap", { cells, metric }).then((r) => r.data.result);
+
+export const runSimulation = (baseline: Record<string, any>, scenarios: any[]) =>
+  api.post("/analytics/simulation/run", { baseline, scenarios }).then((r) => r.data.result);
+
+// ── Events (Phase 10) ───────────────────────────────────
+export const publishEvent = (type: string, payload: Record<string, any> = {}) =>
+  api.post("/events/publish", { type, payload }).then((r) => r.data);
+
+export const recentEvents = (limit = 50) =>
+  api.get("/events/recent", { params: { limit } }).then((r) => r.data.events);
