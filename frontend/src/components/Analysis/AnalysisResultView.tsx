@@ -54,7 +54,7 @@ export default function AnalysisResultView({ result }: { result: any }) {
         <Col xs={24} sm={16}>
           <Row gutter={12}>
             <Col span={12}>
-              <Statistic title="Население в 10 мин" value={result.population_in_isochrone?.["10min"] || "—"} suffix="чел." />
+              <Statistic title="Население в 10 мин" value={result.population_10min || result.population_in_isochrone?.["10min"] || "—"} suffix="чел." />
             </Col>
             <Col span={12}>
               <Statistic

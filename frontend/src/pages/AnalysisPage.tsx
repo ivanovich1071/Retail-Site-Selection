@@ -19,7 +19,6 @@ type Mode = "address" | "map" | "polygon" | "batch";
 export default function AnalysisPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>("address");
-  const [form] = Form.useForm();
   const [jobId, setJobId] = useState<number | null>(null);
   const [starting, setStarting] = useState(false);
 
@@ -44,8 +43,9 @@ export default function AnalysisPage() {
   };
 
   const reset = () => {
+    // The address Card unmounts while a job runs and remounts on reset,
+    // so the form fields clear naturally — no shared form instance needed.
     setJobId(null);
-    form.resetFields();
   };
 
   return (
@@ -67,7 +67,7 @@ export default function AnalysisPage() {
 
       {mode === "address" && !jobId && (
         <Card>
-          <Form form={form} layout="vertical" onFinish={handleStart}>
+          <Form layout="vertical" onFinish={handleStart}>
             <Form.Item name="address" label="Адрес" rules={[{ required: true, message: "Введите адрес" }]}>
               <Input prefix={<SearchOutlined />} placeholder="пр. Независимости 95, Минск" />
             </Form.Item>

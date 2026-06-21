@@ -1,4 +1,5 @@
 import axios from "axios";
+import { logger } from "../utils/logger";
 
 // Use relative path so Vite proxy handles CORS in dev;
 // in production a reverse proxy (nginx) serves the same origin.
@@ -7,20 +8,49 @@ export const api = axios.create({
   timeout: 30000,
 });
 
-// Inject JWT token into every request
+// Inject JWT token + start timer; log outgoing request.
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  (config as any).meta = { start: performance.now() };
+  logger.debug(`→ ${config.method?.toUpperCase()} ${config.url}`);
   return config;
 });
 
-// Handle 401 globally
+// Log responses/errors; handle 401 globally.
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const meta = (response.config as any).meta;
+    const ms = meta ? Math.round(performance.now() - meta.start) : undefined;
+    logger.debug(`← ${response.status} ${response.config.url} (${ms}ms)`);
+    return response;
+  },
   (error) => {
-    if (error.response?.status === 401) {
+    const cfg = error.config || {};
+    const meta = (cfg as any).meta;
+    const ms = meta ? Math.round(performance.now() - meta.start) : undefined;
+    const status = error.response?.status;
+    const detail = error.response?.data?.detail;
+
+    if (error.code === "ECONNABORTED") {
+      logger.error(`timeout ${cfg.method?.toUpperCase?.()} ${cfg.url} (${ms}ms)`, {
+        timeout: api.defaults.timeout,
+      });
+    } else if (!error.response) {
+      logger.error(`network error ${cfg.method?.toUpperCase?.()} ${cfg.url}`, {
+        message: error.message,
+      });
+    } else {
+      logger.error(`${status} ${cfg.method?.toUpperCase?.()} ${cfg.url} (${ms}ms)`, {
+        detail,
+      });
+    }
+
+    if (status === 401) {
       localStorage.removeItem("token");
-      window.location.href = "/login";
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }
