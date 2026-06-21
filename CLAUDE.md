@@ -393,13 +393,32 @@ P(i,j) = (A_j^α / T_ij^β) / Σ_k (A_k^α / T_ik^β)
 - Frontend: New Analysis page (scenario switcher), Location Detail (вкладки + approve/reject),
   JobProgress + useJobProgress hook, AnalysisResultView
 
+**Phase 4 — Competition Intelligence:**
+- `competition/overlap.py` — overlap зон обслуживания (Shapely + circle-fallback, lens area, Jaccard)
+- `competition/cannibalization.py` — revenue transfer, shared-customer probability, penalty factor
+- `competition/white_space.py` — saturation index + ранжирование white-space по H3-ячейкам
+- `competition/market_graph.py` — граф конкуренции (NetworkX optional, competitive pressure)
+- `competition/huff_engine.py` — multi-store allocation + калибровка β (grid search)
+- API: `/competition/{overlap,cannibalization,white-space,market-graph}`
+
+**Phase 5 — Mobility Engine:**
+- `mobility/trajectory.py` — GPS cleaning (speed-spike/jitter filter), trajectory stats
+- `mobility/staypoints.py` — staypoint detection (Li et al.) + dwell time
+- `mobility/od_matrix.py` — OD-матрица по H3-зонам, top flows
+- `mobility/flow_analysis.py` — footfall, peak-hour, commuter ratio
+- API: `/mobility/{clean,staypoints,od-matrix,footfall}`
+
+**Phase 6 — Feature Store:**
+- `feature_store/{spatial,temporal,competition}_features.py` — извлечение фич
+- `feature_store/registry.py` — метаданные + версионирование (14 фич)
+- `feature_store/pipeline.py` — сборка вектора + Redis-кэш (best-effort)
+- API: `/features/{registry,vector}`
+- 34 новых unit-теста (test_competition/mobility/feature_store), всего 68 backend-тестов
+
 ### 🔲 Планируется (v2, по фазам — см. раздел 12)
 **Phase 1** — Core Infrastructure hardening
 **Phase 2** — Spatial Foundation (H3, isochrone engine, POI ingestion)
 **Phase 3** — Location Object Analysis (job-based workflow, catchment)
-**Phase 4** — Competition Intelligence (Huff engine, overlap, cannibalization, market graph)
-**Phase 5** — Mobility Engine (trajectories, staypoints, OD-matrix)
-**Phase 6** — Feature Store (spatial + temporal + competition features)
 **Phase 7** — ML Platform (CatBoost, SHAP, MLflow)
 **Phase 8** — AI Orchestrator (LangGraph, MCP tools, AI drawer)
 **Phase 9** — Heatmap + Scenario Simulation
