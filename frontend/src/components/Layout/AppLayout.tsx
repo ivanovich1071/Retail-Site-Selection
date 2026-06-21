@@ -8,6 +8,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../hooks/redux";
 import { toggleSidebar } from "../../store/uiSlice";
 import { logout } from "../../store/authSlice";
+import AIChat from "../AI/AIChat";
 import type { ReactNode } from "react";
 
 const { Sider, Header, Content } = Layout;
@@ -93,6 +94,8 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           {children}
         </Content>
       </Layout>
+
+      <AIChat />
     </Layout>
   );
 }
