@@ -134,3 +134,36 @@ export const h3GetCell = (h3Index: string) =>
 
 export const h3GetNeighbors = (h3Index: string, k = 1) =>
   api.get(`/h3/neighbors/${h3Index}`, { params: { k } }).then((r) => r.data);
+
+// ── Competition Intelligence (Phase 4) ──────────────────
+export const competitionOverlap = (zones: any[]) =>
+  api.post("/competition/overlap", { zones }).then((r) => r.data.result);
+
+export const competitionCannibalization = (candidate: any, own_stores: any[]) =>
+  api.post("/competition/cannibalization", { candidate, own_stores }).then((r) => r.data.result);
+
+export const competitionWhiteSpace = (cells: any[], min_score = 40, limit?: number) =>
+  api.post("/competition/white-space", { cells, min_score, limit }).then((r) => r.data.result);
+
+export const competitionMarketGraph = (stores: any[], min_overlap = 0.05) =>
+  api.post("/competition/market-graph", { stores, min_overlap }).then((r) => r.data.result);
+
+// ── Mobility Engine (Phase 5) ───────────────────────────
+export const mobilityClean = (points: any[]) =>
+  api.post("/mobility/clean", { points }).then((r) => r.data.result);
+
+export const mobilityStaypoints = (points: any[], max_dist_m = 50, min_duration_s = 300) =>
+  api.post("/mobility/staypoints", { points, max_dist_m, min_duration_s }).then((r) => r.data.result);
+
+export const mobilityODMatrix = (trips: any[][], resolution = 8) =>
+  api.post("/mobility/od-matrix", { trips, resolution }).then((r) => r.data.result);
+
+export const mobilityFootfall = (trajectories: any[][], lat: number, lon: number, radius_m = 100) =>
+  api.post("/mobility/footfall", { trajectories, lat, lon, radius_m }).then((r) => r.data.result);
+
+// ── Feature Store (Phase 6) ─────────────────────────────
+export const featureRegistry = (group?: string) =>
+  api.get("/features/registry", { params: { group } }).then((r) => r.data);
+
+export const buildFeatureVector = (raw: Record<string, any>, entity_id?: string) =>
+  api.post("/features/vector", { raw, entity_id }).then((r) => r.data);
