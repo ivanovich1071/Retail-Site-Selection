@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from backend.app.api.v1.endpoints import (
     locations, analysis, batch, reports, auth, demographics, config, h3,
-    competition, mobility, features,
+    competition, mobility, features, ml, ai, analytics, events,
 )
 
 api_router = APIRouter()
@@ -17,3 +17,7 @@ api_router.include_router(h3.router, prefix="/h3", tags=["H3 Spatial"])
 api_router.include_router(competition.router, prefix="/competition", tags=["Competition"])
 api_router.include_router(mobility.router, prefix="/mobility", tags=["Mobility"])
 api_router.include_router(features.router, prefix="/features", tags=["Feature Store"])
+api_router.include_router(ml.router, prefix="/ml", tags=["ML Platform"])
+api_router.include_router(ai.router, prefix="/ai", tags=["AI Orchestrator"])
+api_router.include_router(analytics.router, prefix="/analytics", tags=["Analytics"])
+api_router.include_router(events.router, prefix="/events", tags=["Events"])

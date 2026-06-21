@@ -62,5 +62,23 @@ class Settings(BaseSettings):
     CANNIBALIZATION_RADIUS_M: int = 800
     ISOCHRONE_CACHE_TTL_DAYS: int = 7
 
+    # ML platform
+    ML_MODEL_DIR: str = "models"
+    ML_MODEL_VERSION: str = "1.0"
+
+    # AI Orchestrator (OpenRouter)
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_MODEL: str = "qwen/qwen3.7-plus"
+    OPENROUTER_TIMEOUT_S: int = 60
+    AI_MAX_TOOL_ITERATIONS: int = 5
+
+    # Events
+    EVENT_STREAM_PREFIX: str = "events"
+    EVENTS_ENABLED: bool = True
+
+    # Observability
+    METRICS_ENABLED: bool = True
+
 
 settings = Settings()
