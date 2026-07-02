@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import re
 from typing import Tuple
 
 from backend.app.core.exceptions import GeocodeError
@@ -7,6 +8,28 @@ from backend.app.integrations.twogis_client import TwoGISClient
 from backend.app.integrations.nominatim_client import NominatimClient
 
 logger = logging.getLogger(__name__)
+
+# Russian street-type abbreviations → full form. Nominatim doesn't expand these
+# (e.g. "пр. Рокоссовского" isn't found, "проспект Рокоссовского" is).
+_ABBREV = {
+    r"\bпр-?т\.?": "проспект",
+    r"\bпр\.": "проспект",
+    r"\bпросп\.": "проспект",
+    r"\bул\.": "улица",
+    r"\bпер\.": "переулок",
+    r"\bпл\.": "площадь",
+    r"\bб-?р\.?": "бульвар",
+    r"\bбул\.": "бульвар",
+    r"\bш\.": "шоссе",
+    r"\bтракт\b": "тракт",
+}
+
+
+def _expand_abbreviations(address: str) -> str:
+    out = address
+    for pat, full in _ABBREV.items():
+        out = re.sub(pat, full, out, flags=re.IGNORECASE)
+    return re.sub(r"\s+", " ", out).strip()
 
 
 class GeocodeService:
@@ -39,10 +62,38 @@ class GeocodeService:
             logger.warning("%s geocode failed (%s); trying fallback", name, e)
             return None
 
+    def _variants(self, address: str) -> list[str]:
+        """Address variants tried in order. Users often abbreviate street types
+        ("пр.") and omit the city/country, which Nominatim needs — expand the
+        abbreviations and append Minsk/Belarus context as fallbacks."""
+        bases = [address]
+        expanded = _expand_abbreviations(address)
+        if expanded.lower() != address.lower():
+            bases.append(expanded)
+
+        variants: list[str] = []
+        for base in bases:
+            low = base.lower()
+            variants.append(base)
+            if "минск" not in low and "minsk" not in low:
+                variants.append(f"{base}, Минск, Беларусь")
+            if "беларус" not in low and "belarus" not in low:
+                variants.append(f"{base}, Беларусь")
+
+        # Deduplicate, preserve order.
+        seen, ordered = set(), []
+        for v in variants:
+            if v not in seen:
+                seen.add(v)
+                ordered.append(v)
+        return ordered
+
     async def geocode(self, address: str) -> Tuple[float, float]:
         """Returns (longitude, latitude)."""
-        for provider, name in ((self.twogis, "2GIS"), (self.nominatim, "Nominatim")):
-            result = await self._try(provider, name, address)
-            if result:
-                return result
+        providers = ((self.twogis, "2GIS"), (self.nominatim, "Nominatim"))
+        for variant in self._variants(address):
+            for provider, name in providers:
+                result = await self._try(provider, name, variant)
+                if result:
+                    return result
         raise GeocodeError(f"Could not geocode address: {address}")

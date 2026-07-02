@@ -2,7 +2,7 @@ from backend.app.feature_store.spatial_features import (
     shannon_diversity, walkability_score, extract_spatial_features,
 )
 from backend.app.feature_store.temporal_features import (
-    seasonality_amplitude, weekday_peak_ratio, extract_temporal_features,
+    seasonality_amplitude, weekday_peak_ratio,
 )
 from backend.app.feature_store.competition_features import (
     location_quotient, extract_competition_features,

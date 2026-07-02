@@ -1,8 +1,9 @@
+import logging
 import os
 import shutil
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
+from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 
@@ -12,11 +13,13 @@ from backend.app.models.batch_job import BatchJob, BatchResult, BatchJobStatus
 from backend.app.schemas.batch import BatchJobOut, BatchResultsPage, BatchResultOut
 from backend.app.api.v1.endpoints.auth import get_current_user
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
 @router.post("/upload", response_model=BatchJobOut, status_code=202)
 async def upload_batch_file(
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(get_current_user),
@@ -43,11 +46,17 @@ async def upload_batch_file(
     await db.commit()
     await db.refresh(job)
 
-    # Dispatch Celery task
-    from backend.app.tasks.batch_tasks import process_batch
-    task = process_batch.delay(job.id, dest)
-    job.celery_task_id = task.id
-    await db.commit()
+    # Dispatch to Celery if a worker stack is available; otherwise run in-process
+    # (FastAPI BackgroundTask) so batch upload works in the local/dev stack.
+    try:
+        from backend.app.tasks.batch_tasks import process_batch
+        task = process_batch.delay(job.id, dest)
+        job.celery_task_id = task.id
+        await db.commit()
+    except Exception as e:  # noqa: BLE001 — Celery/broker unavailable
+        logger.warning("Celery unavailable (%s); running batch %s in-process", e, job.id)
+        from backend.app.services.batch_runner import run_batch_job
+        background_tasks.add_task(run_batch_job, job.id, dest)
 
     return BatchJobOut.model_validate(job)
 

@@ -1,6 +1,6 @@
 from backend.app.ml.feature_pipeline import vector_to_array, raw_to_array, build_dataset, MODEL_FEATURES
 from backend.app.ml.training import train, _ridge_fit, save_model, load_model
-from backend.app.ml.inference import predict_from_raw, predict_from_features, set_model
+from backend.app.ml.inference import predict_from_features, set_model
 from backend.app.ml.explainability import explain
 
 
